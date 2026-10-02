@@ -57,7 +57,9 @@ fun AppShell(
     val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
     val showingDocumentDetail = compact && state.selected != null && destination == AppDestination.Documents
     val handleEvent: (DocumentsUiEvent) -> Unit = { event ->
-        if (event is DocumentsUiEvent.Select) destination = AppDestination.Documents
+        if (event is DocumentsUiEvent.Select || (event is DocumentsUiEvent.SearchChanged && destination == AppDestination.Tags)) {
+            destination = AppDestination.Documents
+        }
         onEvent(event)
     }
 
