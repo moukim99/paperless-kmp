@@ -67,6 +67,7 @@ data class DocumentsUiState(
     val correspondents: List<Correspondent> = emptyList(), val documentTypes: List<DocumentType> = emptyList(), val tags: List<Tag> = emptyList(),
     val selectedCorrespondentId: Long? = null, val selectedDocumentTypeId: Long? = null, val selectedTagIds: Set<Long> = emptySet(),
     val customFields: List<CustomField> = emptyList(), val customFieldValues: Map<Long, String> = emptyMap(),
+    val initialCustomFieldValues: Map<Long, String> = emptyMap(),
     val loading: Boolean = true, val error: String? = null, val importing: Boolean = false, val saving: Boolean = false
 )
 sealed interface DocumentsUiEvent {
@@ -149,7 +150,7 @@ class DocumentsViewModel(
             val d = rel.document
             val ui = DocumentUiModel.fromDomain(d, rel.tags.map(Tag::id).toSet())
             val values = catalog.observeCustomFieldValues(id).first().associate { it.fieldId to (it.text ?: it.longText ?: it.select ?: it.boolean?.toString() ?: it.int?.toString() ?: it.float?.toString() ?: it.monetary ?: "") }
-            _state.update { it.copy(selectedId=id, selected=ui, editTitle=ui.title, editExpiry=ui.expiresAtEpochMillis?.let { m -> Instant.fromEpochMilliseconds(m).toString().take(10) } ?: "", editReminderDays=(ui.reminderDaysBeforeExpiry ?: 30).toString(), selectedCorrespondentId=rel.correspondent?.id, selectedDocumentTypeId=rel.documentType?.id, selectedTagIds=ui.tagIds, customFieldValues=values) }
+            _state.update { it.copy(selectedId=id, selected=ui, editTitle=ui.title, editExpiry=ui.expiresAtEpochMillis?.let { m -> Instant.fromEpochMilliseconds(m).toString().take(10) } ?: "", editReminderDays=(ui.reminderDaysBeforeExpiry ?: 30).toString(), selectedCorrespondentId=rel.correspondent?.id, selectedDocumentTypeId=rel.documentType?.id, selectedTagIds=ui.tagIds, customFieldValues=values, initialCustomFieldValues=values) }
         }
     }
     private fun saveMetadata() = scope.launch {
@@ -163,6 +164,11 @@ class DocumentsViewModel(
             catalog.setDocumentTags(id, s.selectedTagIds.toList())
             s.customFields.forEach { field -> catalog.saveCustomFieldValue(CustomFieldValue(0, id, field.id, s.customFieldValues[field.id], null, null, null, null, null, null, null, null)) }
             if (expiry != null && days != null) reminders.schedule(id, s.editTitle, expiry.toEpochMilliseconds(), days) else reminders.cancel(id)
+            val updated = repository.observeDocument(id).first()
+            if (updated != null) {
+                val updatedUi = DocumentUiModel.fromDomain(updated.document, updated.tags.map(Tag::id).toSet())
+                _state.update { it.copy(selected = updatedUi, selectedTagIds = updatedUi.tagIds, initialCustomFieldValues = s.customFieldValues) }
+            }
         }.onFailure { e -> _state.update { it.copy(error=e.message) } }
         _state.update { it.copy(saving=false) }
     }
