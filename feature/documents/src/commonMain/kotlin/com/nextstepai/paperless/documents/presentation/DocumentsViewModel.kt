@@ -13,11 +13,53 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.*
 
+enum class ExpiryState { None, Upcoming, Today, Expired }
+
 data class DocumentUiModel(
-    val id: Long, val title: String, val createdEpochMillis: Long, val expiresAtEpochMillis: Long?,
-    val pageCount: Int?, val mimeType: String, val syncState: String, val content: String,
-    val filename: String?, val reminderDaysBeforeExpiry: Int?, val correspondentId: Long?, val documentTypeId: Long?, val tagIds: Set<Long>
-) { companion object { fun fromDomain(d: Document, tagIds: Set<Long> = emptySet()) = DocumentUiModel(d.id, d.title, d.created.toEpochMilliseconds(), d.expiresAt?.toEpochMilliseconds(), d.pageCount, d.mimeType, d.syncState, d.content, d.filename, d.reminderDaysBeforeExpiry, d.correspondentId, null, tagIds) } }
+    val id: Long,
+    val title: String,
+    val createdEpochMillis: Long,
+    val expiresAtEpochMillis: Long?,
+    val pageCount: Int?,
+    val mimeType: String,
+    val syncState: String,
+    val content: String,
+    val filename: String?,
+    val reminderDaysBeforeExpiry: Int?,
+    val correspondentId: Long?,
+    val documentTypeId: Long?,
+    val tagIds: Set<Long>,
+    val expiryState: ExpiryState = ExpiryState.None,
+    val expiryLabel: String? = null,
+) {
+    companion object {
+        fun fromDomain(d: Document, tagIds: Set<Long> = emptySet()): DocumentUiModel {
+            val expiry = d.expiresAt?.toEpochMilliseconds()
+            val state = expiry?.let {
+                val days = ((it - Clock.System.now().toEpochMilliseconds()) / 86_400_000L).toInt()
+                when {
+                    days < 0 -> ExpiryState.Expired
+                    days == 0 -> ExpiryState.Today
+                    else -> ExpiryState.Upcoming
+                }
+            } ?: ExpiryState.None
+            val label = expiry?.let {
+                val days = ((it - Clock.System.now().toEpochMilliseconds()) / 86_400_000L).toInt()
+                when {
+                    days < 0 -> "Expired"
+                    days == 0 -> "Expires today"
+                    days == 1 -> "Expires tomorrow"
+                    else -> "Expires in $days days"
+                }
+            }
+            return DocumentUiModel(
+                d.id, d.title, d.created.toEpochMilliseconds(), expiry, d.pageCount, d.mimeType,
+                d.syncState, d.content, d.filename, d.reminderDaysBeforeExpiry, d.correspondentId,
+                d.documentTypeId, tagIds, state, label
+            )
+        }
+    }
+}
 
 data class DocumentsUiState(
     val documents: List<DocumentUiModel> = emptyList(), val query: String = "", val selectedId: Long? = null,
