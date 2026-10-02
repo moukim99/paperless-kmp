@@ -1,5 +1,11 @@
 package com.nextstepai.paperless.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +38,7 @@ import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FindInPage
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Notifications
@@ -398,30 +405,47 @@ private fun ModernDocumentCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val isPdf = document.mimeType.contains("pdf", ignoreCase = true)
+    val isImage = document.mimeType.contains("image", ignoreCase = true)
+    val containerColor = when {
+        selected -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val thumbColor = when {
+        isPdf -> MaterialTheme.colorScheme.errorContainer
+        isImage -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val thumbIconColor = when {
+        isPdf -> MaterialTheme.colorScheme.onErrorContainer
+        isImage -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onPrimaryContainer
+    }
+    val thumbIcon = when {
+        isImage -> Icons.Outlined.Image
+        else -> Icons.Outlined.Description
+    }
+
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected)
-                MaterialTheme.colorScheme.secondaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceContainerLow
-        )
+        colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Row(
             Modifier.fillMaxWidth().padding(PaperlessDimensions.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(52.dp),
                 shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = thumbColor
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Outlined.Description,
+                        thumbIcon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = thumbIconColor,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -434,18 +458,28 @@ private fun ModernDocumentCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2
                 )
-                Text(
-                    buildString {
-                        correspondent?.let { append(it); append(" · ") }
-                        append(document.mimeType.substringAfterLast('/').uppercase())
-                        append(" · ")
-                        append(document.pageCount ?: 1)
-                        append(if ((document.pageCount ?: 1) == 1) " page" else " pages")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)) {
+                if (!correspondent.isNullOrBlank()) {
+                    Text(
+                        correspondent,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text(document.mimeType.substringAfterLast('/').uppercase()) }
+                    )
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("${document.pageCount ?: 1}p") }
+                    )
                     document.expiryLabel?.let { ExpiryBadge(document.expiryState, it) }
                     SyncBadge(document.syncState)
                 }
@@ -534,7 +568,11 @@ private fun DocumentDetails(
             {}
         },
         bottomBar = {
-            if (dirty) {
+            AnimatedVisibility(
+                visible = dirty,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
                 Surface(tonalElevation = 3.dp) {
                     Row(
                         Modifier.fillMaxWidth().padding(PaperlessDimensions.lg),
@@ -1179,7 +1217,7 @@ private fun DetailCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(PaperlessDimensions.lg),
+            Modifier.fillMaxWidth().animateContentSize().padding(PaperlessDimensions.lg),
             verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm),
             content = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
