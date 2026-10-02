@@ -162,7 +162,20 @@ class DocumentsViewModel(
             updateMetadata(id, s.editTitle, expiry, days)
             catalog.updateDocumentClassification(id, s.selectedCorrespondentId, s.selectedDocumentTypeId)
             catalog.setDocumentTags(id, s.selectedTagIds.toList())
-            s.customFields.forEach { field -> catalog.saveCustomFieldValue(CustomFieldValue(0, id, field.id, s.customFieldValues[field.id], null, null, null, null, null, null, null, null)) }
+            s.customFields.forEach { field ->
+                val value = s.customFieldValues[field.id].orEmpty().trim().takeIf { it.isNotEmpty() }
+                val customValue = when (field.type) {
+                    CustomFieldType.BOOLEAN -> CustomFieldValue(0, id, field.id, null, value?.toBooleanStrictOrNull(), null, null, null, null, null, null, null)
+                    CustomFieldType.DATE -> CustomFieldValue(0, id, field.id, null, null, value?.let { runCatching { LocalDate.parse(it) }.getOrNull()?.toEpochDays()?.toLong() }, null, null, null, null, null, null)
+                    CustomFieldType.INTEGER -> CustomFieldValue(0, id, field.id, null, null, null, value?.toLongOrNull(), null, null, null, null, null)
+                    CustomFieldType.FLOAT -> CustomFieldValue(0, id, field.id, null, null, null, null, value?.toDoubleOrNull(), null, null, null, null)
+                    CustomFieldType.MONETARY -> CustomFieldValue(0, id, field.id, null, null, null, null, null, value, null, null, null)
+                    CustomFieldType.SELECT -> CustomFieldValue(0, id, field.id, null, null, null, null, null, null, null, value, null)
+                    CustomFieldType.LONG_TEXT -> CustomFieldValue(0, id, field.id, null, null, null, null, null, null, null, null, value)
+                    else -> CustomFieldValue(0, id, field.id, value, null, null, null, null, null, null, null, null)
+                }
+                catalog.saveCustomFieldValue(customValue)
+            }
             if (expiry != null && days != null) reminders.schedule(id, s.editTitle, expiry.toEpochMilliseconds(), days) else reminders.cancel(id)
             val updated = repository.observeDocument(id).first()
             if (updated != null) {
