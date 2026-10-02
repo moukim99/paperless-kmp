@@ -71,6 +71,7 @@ data class DocumentsUiState(
 )
 sealed interface DocumentsUiEvent {
     data class SearchChanged(val value: String): DocumentsUiEvent
+    data object ClearSelection: DocumentsUiEvent
     data class Select(val id: Long): DocumentsUiEvent
     data class Delete(val id: Long): DocumentsUiEvent
     data class Import(val input: DocumentInput): DocumentsUiEvent
@@ -109,6 +110,7 @@ class DocumentsViewModel(
         when (event) {
             is DocumentsUiEvent.SearchChanged -> { _state.update { it.copy(query = event.value, error = null) }; scope.launch { runCatching { repository.search(event.value) }.onSuccess { docs -> _state.update { it.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } } }
             is DocumentsUiEvent.Select -> select(event.id)
+            DocumentsUiEvent.ClearSelection -> _state.update { it.copy(selectedId = null, selected = null) }
             is DocumentsUiEvent.Delete -> scope.launch { runCatching { delete(event.id); if (_state.value.selectedId == event.id) _state.update { it.copy(selectedId = null, selected = null) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } }
             is DocumentsUiEvent.Import -> scope.launch { _state.update { it.copy(importing = true, error = null) }; runCatching { capture(event.input) }.onFailure { e -> _state.update { it.copy(error = e.message) } }; _state.update { it.copy(importing = false) } }
             is DocumentsUiEvent.TitleChanged -> _state.update { it.copy(editTitle = event.value) }
