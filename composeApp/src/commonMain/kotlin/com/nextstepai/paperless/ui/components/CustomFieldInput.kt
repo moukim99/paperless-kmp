@@ -4,13 +4,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -52,6 +67,7 @@ fun CustomFieldInput(
     field: CustomField,
     value: String,
     onValueChange: (String) -> Unit,
+    availableDocuments: List<Pair<Long, String>> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     when (field.type) {
@@ -249,6 +265,67 @@ fun CustomFieldInput(
             )
         }
 
+        CustomFieldType.DOCUMENT_LINK -> {
+            var showPicker by remember { mutableStateOf(false) }
+            val linkedIds = remember(value) { parseDocumentIds(value) }
+            val linkedDocs = remember(linkedIds, availableDocuments) {
+                linkedIds.mapNotNull { id ->
+                    availableDocuments.firstOrNull { it.first == id } ?: (id to "Document #$id")
+                }
+            }
+
+            Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                Text(field.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(linkedDocs) { (docId, title) ->
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(title, maxLines = 1) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        val newIds = linkedIds.filterNot { it == docId }
+                                        onValueChange(serializeDocumentIds(newIds))
+                                    },
+                                    modifier = Modifier.size(18.dp)
+                                ) {
+                                    Icon(Icons.Outlined.Close, contentDescription = "Remove document link")
+                                }
+                            }
+                        )
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { showPicker = true },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Link Document", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+                if (linkedDocs.isEmpty()) {
+                    Text("No linked documents", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            if (showPicker) {
+                DocumentLinkPickerDialog(
+                    title = "Link to " + field.name,
+                    availableDocuments = availableDocuments.filterNot { it.first in linkedIds },
+                    onDocumentSelected = { selectedDocId ->
+                        val newIds = linkedIds + selectedDocId
+                        onValueChange(serializeDocumentIds(newIds))
+                    },
+                    onDismiss = { showPicker = false }
+                )
+            }
+        }
+
         else -> {
             OutlinedTextField(
                 value = value,
@@ -260,6 +337,69 @@ fun CustomFieldInput(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DocumentLinkPickerDialog(
+    title: String,
+    availableDocuments: List<Pair<Long, String>>,
+    onDocumentSelected: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredDocs = remember(availableDocuments, searchQuery) {
+        if (searchQuery.isBlank()) availableDocuments
+        else availableDocuments.filter { it.second.contains(searchQuery, ignoreCase = true) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().height(300.dp),
+                verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search documents") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                    singleLine = true
+                )
+                if (filteredDocs.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No available documents to link", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                        items(filteredDocs) { (id, title) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onDocumentSelected(id)
+                                        onDismiss()
+                                    }
+                                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -319,4 +459,15 @@ private fun parseSelectOptions(rawJson: String?): List<String> {
             .filter { it.isNotBlank() }
     }
     return trimmed.split(",").map { it.trim() }.filter { it.isNotBlank() }
+}
+
+private fun parseDocumentIds(raw: String): List<Long> {
+    if (raw.isBlank()) return emptyList()
+    val clean = raw.trim().removePrefix("[").removeSuffix("]")
+    return clean.split(",").mapNotNull { it.trim().trim('"', '\'').toLongOrNull() }
+}
+
+private fun serializeDocumentIds(ids: List<Long>): String {
+    if (ids.isEmpty()) return ""
+    return "[${ids.joinToString(",")}]"
 }

@@ -33,6 +33,9 @@ data class DocumentUiModel(
     val storagePathId: Long?,
     val archiveSerialNumber: Long?,
     val tagIds: Set<Long>,
+    val rootDocumentId: Long? = null,
+    val versionIndex: Int? = 1,
+    val versionLabel: String? = null,
     val expiryState: ExpiryState = ExpiryState.None,
     val expiryLabel: String? = null,
     val expiryInput: String = "",
@@ -78,6 +81,9 @@ data class DocumentUiModel(
                 storagePathId = d.storagePathId,
                 archiveSerialNumber = d.archiveSerialNumber,
                 tagIds = tagIds,
+                rootDocumentId = d.rootDocumentId,
+                versionIndex = d.versionIndex ?: 1,
+                versionLabel = d.versionLabel,
                 expiryState = state,
                 expiryLabel = label,
                 expiryInput = expiryInput
@@ -92,6 +98,8 @@ data class DocumentsUiState(
     val selectedId: Long? = null,
     val selected: DocumentUiModel? = null,
     val editTitle: String = "",
+    val editContent: String = "",
+    val editVersionLabel: String = "",
     val editCreatedDate: String = "",
     val editExpiry: String = "",
     val editArchiveSerialNumber: String = "",
@@ -100,6 +108,7 @@ data class DocumentsUiState(
     val documentTypes: List<DocumentType> = emptyList(),
     val storagePaths: List<StoragePath> = emptyList(),
     val tags: List<Tag> = emptyList(),
+    val documentVersions: List<DocumentUiModel> = emptyList(),
     val selectedCorrespondentId: Long? = null,
     val selectedDocumentTypeId: Long? = null,
     val selectedStoragePathId: Long? = null,
@@ -122,9 +131,12 @@ sealed interface DocumentsUiEvent {
     data class SearchChanged(val value: String): DocumentsUiEvent
     data object ClearSelection: DocumentsUiEvent
     data class Select(val id: Long): DocumentsUiEvent
+    data class SelectVersion(val documentId: Long): DocumentsUiEvent
     data class Delete(val id: Long): DocumentsUiEvent
     data class Import(val input: DocumentInput): DocumentsUiEvent
     data class TitleChanged(val value: String): DocumentsUiEvent
+    data class ContentChanged(val value: String): DocumentsUiEvent
+    data class VersionLabelChanged(val value: String): DocumentsUiEvent
     data class CreatedDateChanged(val value: String): DocumentsUiEvent
     data class ExpiryChanged(val value: String): DocumentsUiEvent
     data class ArchiveSerialNumberChanged(val value: String): DocumentsUiEvent
@@ -203,10 +215,13 @@ class DocumentsViewModel(
                 }
             }
             is DocumentsUiEvent.Select -> select(event.id)
+            is DocumentsUiEvent.SelectVersion -> select(event.documentId)
             DocumentsUiEvent.ClearSelection -> _state.update { it.copy(selectedId = null, selected = null) }
             is DocumentsUiEvent.Delete -> scope.launch { runCatching { delete(event.id); if (_state.value.selectedId == event.id) _state.update { it.copy(selectedId = null, selected = null) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } }
             is DocumentsUiEvent.Import -> scope.launch { _state.update { it.copy(importing = true, error = null) }; runCatching { capture(event.input) }.onFailure { e -> _state.update { it.copy(error = e.message) } }; _state.update { it.copy(importing = false) } }
             is DocumentsUiEvent.TitleChanged -> _state.update { it.copy(editTitle = event.value) }
+            is DocumentsUiEvent.ContentChanged -> _state.update { it.copy(editContent = event.value) }
+            is DocumentsUiEvent.VersionLabelChanged -> _state.update { it.copy(editVersionLabel = event.value) }
             is DocumentsUiEvent.CreatedDateChanged -> _state.update { it.copy(editCreatedDate = event.value) }
             is DocumentsUiEvent.ExpiryChanged -> _state.update { it.copy(editExpiry = event.value) }
             is DocumentsUiEvent.ArchiveSerialNumberChanged -> _state.update { it.copy(editArchiveSerialNumber = event.value.filter(Char::isDigit)) }
@@ -290,12 +305,16 @@ class DocumentsViewModel(
             val d = rel.document
             val lastSyncError = repository.observeLatestSyncError(id).firstOrNull()
             val ui = DocumentUiModel.fromDomain(d, rel.tags.map(Tag::id).toSet()).copy(lastSyncError = lastSyncError)
-            val values = catalog.observeCustomFieldValues(id).firstOrNull()?.associate { it.fieldId to (it.text ?: it.longText ?: it.select ?: it.boolean?.toString() ?: it.dateEpochDay?.let { ep -> LocalDate.fromEpochDays(ep.toInt()).toString() } ?: it.int?.toString() ?: it.float?.toString() ?: it.monetary ?: "") }.orEmpty()
+            val values = catalog.observeCustomFieldValues(id).firstOrNull()?.associate {
+                it.fieldId to (it.text ?: it.longText ?: it.select ?: it.documentIdsJson ?: it.boolean?.toString() ?: it.dateEpochDay?.let { ep -> LocalDate.fromEpochDays(ep.toInt()).toString() } ?: it.int?.toString() ?: it.float?.toString() ?: it.monetary ?: "")
+            }.orEmpty()
             _state.update {
                 it.copy(
                     selectedId = id,
                     selected = ui,
                     editTitle = ui.title,
+                    editContent = ui.content,
+                    editVersionLabel = ui.versionLabel.orEmpty(),
                     editCreatedDate = ui.createdInput,
                     editExpiry = ui.expiryInput,
                     editArchiveSerialNumber = ui.archiveSerialNumber?.toString().orEmpty(),
@@ -307,6 +326,10 @@ class DocumentsViewModel(
                     customFieldValues = values,
                     initialCustomFieldValues = values
                 )
+            }
+            val rootId = ui.rootDocumentId ?: ui.id
+            repository.observeVersions(rootId).firstOrNull()?.let { versions ->
+                _state.update { s -> s.copy(documentVersions = versions.map { DocumentUiModel.fromDomain(it) }) }
             }
         }
     }
@@ -323,7 +346,7 @@ class DocumentsViewModel(
                 ?.let { runCatching { LocalDate.parse(it).atStartOfDayIn(TimeZone.UTC) }.getOrNull() }
             val days = s.editReminderDays.toIntOrNull()?.coerceIn(0, 3650)
 
-            updateMetadata(id, s.editTitle, createdInstant, archiveSn, expiry, days)
+            updateMetadata(id, s.editTitle, s.editContent, s.editVersionLabel, createdInstant, archiveSn, expiry, days)
             catalog.updateDocumentClassification(id, s.selectedCorrespondentId, s.selectedDocumentTypeId, s.selectedStoragePathId)
             catalog.setDocumentTags(id, s.selectedTagIds.toList())
 
@@ -337,6 +360,7 @@ class DocumentsViewModel(
                     CustomFieldType.MONETARY -> CustomFieldValue(0, id, field.id, null, null, null, null, null, value, null, null, null)
                     CustomFieldType.SELECT -> CustomFieldValue(0, id, field.id, null, null, null, null, null, null, null, value, null)
                     CustomFieldType.LONG_TEXT -> CustomFieldValue(0, id, field.id, null, null, null, null, null, null, null, null, value)
+                    CustomFieldType.DOCUMENT_LINK -> CustomFieldValue(0, id, field.id, null, null, null, null, null, null, value, null, null)
                     else -> CustomFieldValue(0, id, field.id, value, null, null, null, null, null, null, null, null)
                 }
                 catalog.saveCustomFieldValue(customValue)

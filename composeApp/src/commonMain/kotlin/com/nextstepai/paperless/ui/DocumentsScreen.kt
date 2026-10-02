@@ -493,9 +493,15 @@ private fun DocumentDetails(
 ) {
     var confirmDelete by remember(selected.id) { mutableStateOf(false) }
     var ocrExpanded by rememberSaveable(selected.id) { mutableStateOf(false) }
+    var editOcrMode by remember(selected.id) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val availableDocs = remember(state.documents) {
+        state.documents.map { it.id to it.title.ifBlank { "Untitled document #${it.id}" } }
+    }
 
     val dirty = state.editTitle != selected.title ||
+        state.editContent != selected.content ||
+        state.editVersionLabel != selected.versionLabel.orEmpty() ||
         state.editCreatedDate != selected.createdInput ||
         state.editExpiry != selected.expiryInput ||
         state.editArchiveSerialNumber != selected.archiveSerialNumber?.toString().orEmpty() ||
@@ -650,6 +656,59 @@ private fun DocumentDetails(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
                     )
+                    Spacer(Modifier.height(PaperlessDimensions.md))
+                    OutlinedTextField(
+                        value = state.editVersionLabel,
+                        onValueChange = { onEvent(DocumentsUiEvent.VersionLabelChanged(it)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Version label") },
+                        placeholder = { Text("e.g. Draft, Signed Final") },
+                        singleLine = true
+                    )
+                }
+            }
+
+            if (state.documentVersions.size > 1) {
+                item {
+                    DetailCard(title = "Document versions (${state.documentVersions.size})", icon = Icons.Outlined.FolderOpen) {
+                        Column(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                            state.documentVersions.forEach { ver ->
+                                val isCurrent = ver.id == selected.id
+                                Surface(
+                                    onClick = { if (!isCurrent) onEvent(DocumentsUiEvent.SelectVersion(ver.id)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(PaperlessDimensions.md),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                "Version ${ver.versionIndex ?: 1}" + if (!ver.versionLabel.isNullOrBlank()) " - ${ver.versionLabel}" else "",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                "Created: ${ver.createdInput}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        if (isCurrent) {
+                                            AssistChip(
+                                                onClick = {},
+                                                enabled = false,
+                                                label = { Text("Current") }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -736,7 +795,8 @@ private fun DocumentDetails(
                                 CustomFieldInput(
                                     field = field,
                                     value = state.customFieldValues[field.id].orEmpty(),
-                                    onValueChange = { onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it)) }
+                                    onValueChange = { onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it)) },
+                                    availableDocuments = availableDocs
                                 )
                             }
                         }
@@ -750,8 +810,13 @@ private fun DocumentDetails(
                         horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
                     ) {
                         FilledTonalButton(
-                            onClick = { clipboard.setText(AnnotatedString(selected.content)) },
-                            enabled = selected.content.isNotBlank()
+                            onClick = { editOcrMode = !editOcrMode }
+                        ) {
+                            Text(if (editOcrMode) "Done editing" else "Edit text")
+                        }
+                        FilledTonalButton(
+                            onClick = { clipboard.setText(AnnotatedString(state.editContent)) },
+                            enabled = state.editContent.isNotBlank()
                         ) {
                             Icon(Icons.Outlined.ContentCopy, null)
                             Spacer(Modifier.width(PaperlessDimensions.sm))
@@ -759,14 +824,14 @@ private fun DocumentDetails(
                         }
                         OutlinedButton(
                             onClick = {
-                                val query = selected.content
+                                val query = state.editContent
                                     .trim()
                                     .split(Regex("\\s+"))
                                     .take(6)
                                     .joinToString(" ")
                                 if (query.isNotBlank()) onEvent(DocumentsUiEvent.SearchChanged(query))
                             },
-                            enabled = selected.content.isNotBlank()
+                            enabled = state.editContent.isNotBlank()
                         ) {
                             Icon(Icons.Outlined.Search, null)
                             Spacer(Modifier.width(PaperlessDimensions.sm))
@@ -776,17 +841,26 @@ private fun DocumentDetails(
 
                     Spacer(Modifier.height(PaperlessDimensions.md))
 
-                    if (selected.content.isBlank()) {
+                    if (editOcrMode) {
+                        OutlinedTextField(
+                            value = state.editContent,
+                            onValueChange = { onEvent(DocumentsUiEvent.ContentChanged(it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Extracted OCR text / Notes") },
+                            minLines = 6,
+                            maxLines = 15
+                        )
+                    } else if (state.editContent.isBlank()) {
                         Text(
                             "No OCR text available.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         Text(
-                            if (ocrExpanded) selected.content else selected.content.take(320) + if (selected.content.length > 320) "…" else "",
+                            if (ocrExpanded) state.editContent else state.editContent.take(320) + if (state.editContent.length > 320) "…" else "",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        if (selected.content.length > 320) {
+                        if (state.editContent.length > 320) {
                             TextButton(onClick = { ocrExpanded = !ocrExpanded }) {
                                 Text(if (ocrExpanded) "Show less" else "Show full text")
                             }
@@ -1068,12 +1142,24 @@ private fun DocumentHeader(selected: DocumentUiModel) {
                 selected.title.ifBlank { "Untitled document" },
                 style = MaterialTheme.typography.headlineSmall
             )
-            Text(
-                selected.mimeType.substringAfterLast('/').uppercase() + " · " +
-                    (selected.pageCount ?: 1) +
-                    if ((selected.pageCount ?: 1) == 1) " page" else " pages",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)
+            ) {
+                Text(
+                    selected.mimeType.substringAfterLast('/').uppercase() + " · " +
+                        (selected.pageCount ?: 1) +
+                        if ((selected.pageCount ?: 1) == 1) " page" else " pages",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = {
+                        Text("v${selected.versionIndex ?: 1}" + if (!selected.versionLabel.isNullOrBlank()) ": ${selected.versionLabel}" else "")
+                    }
+                )
+            }
             selected.expiryLabel?.let {
                 Spacer(Modifier.height(PaperlessDimensions.sm))
                 ExpiryBadge(selected.expiryState, it)
