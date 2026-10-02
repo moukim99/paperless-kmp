@@ -33,6 +33,12 @@ interface SyncOperationDao {
     @Update
     suspend fun update(entity: SyncOperationEntity)
 
+    @Query("SELECT * FROM sync_operations WHERE documentId = :documentId ORDER BY createdAt DESC LIMIT 1")
+    fun observeLatestForDocument(documentId: Long): Flow<SyncOperationEntity?>
+
+    @Query("SELECT * FROM sync_operations WHERE documentId = :documentId ORDER BY createdAt DESC LIMIT 1")
+    suspend fun latestForDocument(documentId: Long): SyncOperationEntity?
+
     @Query("DELETE FROM sync_operations WHERE documentId = :documentId AND operation = :operation")
     suspend fun deleteOperation(documentId: Long, operation: String)
 }

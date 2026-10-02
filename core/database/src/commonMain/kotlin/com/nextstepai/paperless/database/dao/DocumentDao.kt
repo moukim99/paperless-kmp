@@ -27,8 +27,8 @@ interface DocumentDao {
     @Query("UPDATE documents SET remoteId = :remoteId, serverVersion = :serverVersion, syncedAt = :syncedAt, lastSyncedModified = :syncedModified, syncState = 'SYNCED' WHERE id = :id")
     suspend fun markSynced(id: Long, remoteId: String, serverVersion: Long, syncedAt: Long, syncedModified: Long)
     @Query("UPDATE documents SET syncState = :state WHERE id = :id") suspend fun markSyncState(id: Long, state: String)
-    @Query("UPDATE documents SET title = :title, expiresAt = :expiresAt, reminderDaysBeforeExpiry = :reminderDaysBeforeExpiry, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :id")
-    suspend fun updateMetadata(id: Long, title: String, expiresAt: Long?, reminderDaysBeforeExpiry: Int?, modified: Long)
+    @Query("UPDATE documents SET title = :title, created = :created, archiveSerialNumber = :archiveSerialNumber, expiresAt = :expiresAt, reminderDaysBeforeExpiry = :reminderDaysBeforeExpiry, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :id")
+    suspend fun updateMetadata(id: Long, title: String, created: Long, archiveSerialNumber: Long?, expiresAt: Long?, reminderDaysBeforeExpiry: Int?, modified: Long)
 }
 
 @Dao

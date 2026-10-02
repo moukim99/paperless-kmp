@@ -14,7 +14,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
         }
         androidMain.dependencies {
             implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")

@@ -30,14 +30,14 @@ actual object AppContainer {
         val app = requireNotNull(context as? Context) { "Android Context is required" }.applicationContext
         initializeDatabaseContext(app)
         val db = buildDatabase(getDatabaseBuilder())
-        val repository = RoomDocumentRepository(db.documentDao())
+        val repository = RoomDocumentRepository(db.documentDao(), db.syncOperationDao())
         val enqueuer = EnqueueSyncOperationUseCase(db.syncOperationDao())
         val fileStore = AndroidDocumentFileStore(app)
         androidPreviewContext = app
         androidPreviewStore = fileStore
         val capture = ProcessDocumentCaptureUseCase(repository, AndroidMlKitOcrEngine(), fileStore, checksumGenerator = AndroidChecksumGenerator(), enqueuer = enqueuer)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        _viewModel = DocumentsViewModel(repository, RoomCatalogRepository(db.catalogDao()), capture, DeleteDocumentUseCase(repository, enqueuer), UpdateDocumentMetadataUseCase(repository, enqueuer), PlatformDocumentPreviewer, AndroidReminderScheduler(app), scope)
+        _viewModel = DocumentsViewModel(repository, RoomCatalogRepository(db.catalogDao()), capture, DeleteDocumentUseCase(repository, enqueuer), UpdateDocumentMetadataUseCase(repository, enqueuer), PlatformDocumentPreviewer, AndroidReminderScheduler(app), scope, syncEnqueuer = enqueuer, onTriggerSync = { startBackgroundSync() })
         val token = BuildConfig.API_TOKEN.takeIf { it.isNotBlank() }
         val baseUrl = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() && !it.contains("example.invalid") }
         if (baseUrl != null && token != null) {

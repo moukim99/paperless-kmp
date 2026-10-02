@@ -18,8 +18,8 @@ class DeleteDocumentUseCase(private val repository: DocumentRepository, private 
     suspend operator fun invoke(id: Long) { repository.delete(id); enqueuer?.enqueue(id, "DELETE") }
 }
 class UpdateDocumentMetadataUseCase(private val repository: DocumentRepository, private val enqueuer: SyncOperationEnqueuer? = null) {
-    suspend operator fun invoke(id: Long, title: String, expiresAt: kotlinx.datetime.Instant?, reminderDaysBeforeExpiry: Int?) {
-        repository.updateMetadata(id, title.trim().ifBlank { "Untitled document" }, expiresAt?.toEpochMilliseconds(), reminderDaysBeforeExpiry)
+    suspend operator fun invoke(id: Long, title: String, created: kotlin.time.Instant, archiveSerialNumber: Long?, expiresAt: kotlin.time.Instant?, reminderDaysBeforeExpiry: Int?) {
+        repository.updateMetadata(id, title.trim().ifBlank { "Untitled document" }, created.toEpochMilliseconds(), archiveSerialNumber, expiresAt?.toEpochMilliseconds(), reminderDaysBeforeExpiry)
         enqueuer?.enqueue(id, "UPLOAD")
     }
 }

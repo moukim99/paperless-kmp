@@ -9,12 +9,23 @@ interface CatalogDao {
     @Query("SELECT * FROM tags ORDER BY name COLLATE NOCASE") fun observeTags(): Flow<List<TagEntity>>
     @Query("SELECT * FROM correspondents ORDER BY name COLLATE NOCASE") fun observeCorrespondents(): Flow<List<CorrespondentEntity>>
     @Query("SELECT * FROM document_types ORDER BY name COLLATE NOCASE") fun observeDocumentTypes(): Flow<List<DocumentTypeEntity>>
+    @Query("SELECT * FROM storage_paths ORDER BY name COLLATE NOCASE") fun observeStoragePaths(): Flow<List<StoragePathEntity>>
     @Query("SELECT * FROM custom_fields ORDER BY name COLLATE NOCASE") fun observeCustomFields(): Flow<List<CustomFieldEntity>>
     @Query("SELECT * FROM custom_field_instances WHERE documentId = :documentId AND isDeleted = 0 ORDER BY fieldId") fun observeCustomFieldValues(documentId: Long): Flow<List<CustomFieldInstanceEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertTag(value: TagEntity): Long
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertCorrespondent(value: CorrespondentEntity): Long
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertDocumentType(value: DocumentTypeEntity): Long
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertStoragePath(value: StoragePathEntity): Long
+
+    @Query("DELETE FROM tags WHERE id = :id") suspend fun deleteTag(id: Long)
+    @Query("DELETE FROM correspondents WHERE id = :id") suspend fun deleteCorrespondent(id: Long)
+    @Query("DELETE FROM document_types WHERE id = :id") suspend fun deleteDocumentType(id: Long)
+    @Query("DELETE FROM storage_paths WHERE id = :id") suspend fun deleteStoragePath(id: Long)
 
     @Query("SELECT tagId FROM document_tags WHERE documentId = :documentId") suspend fun tagIds(documentId: Long): List<Long>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertDocumentTag(value: DocumentTagCrossRef)
     @Query("DELETE FROM document_tags WHERE documentId = :documentId") suspend fun clearDocumentTags(documentId: Long)
-    @Query("UPDATE documents SET correspondentId = :correspondentId, documentTypeId = :documentTypeId, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :documentId") suspend fun updateClassification(documentId: Long, correspondentId: Long?, documentTypeId: Long?, modified: Long)
+    @Query("UPDATE documents SET correspondentId = :correspondentId, documentTypeId = :documentTypeId, storagePathId = :storagePathId, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :documentId") suspend fun updateClassification(documentId: Long, correspondentId: Long?, documentTypeId: Long?, storagePathId: Long?, modified: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertCustomFieldValue(value: CustomFieldInstanceEntity)
 }

@@ -1,5 +1,6 @@
 package com.nextstepai.paperless.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -27,20 +29,27 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FindInPage
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -51,15 +60,19 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,27 +80,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
-import androidx.compose.material3.adaptive.layout.calculateListDetailPaneScaffoldState
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowWidthSizeClass
 import com.nextstepai.paperless.documents.presentation.DocumentUiModel
 import com.nextstepai.paperless.documents.presentation.DocumentsUiEvent
 import com.nextstepai.paperless.documents.presentation.DocumentsUiState
-import com.nextstepai.paperless.documents.presentation.ExpiryState
 import com.nextstepai.paperless.platform.DocumentPickerButton
 import com.nextstepai.paperless.platform.DocumentScannerButton
+import com.nextstepai.paperless.ui.components.CustomFieldInput
 import com.nextstepai.paperless.ui.components.EmptyState
 import com.nextstepai.paperless.ui.components.ExpiryBadge
 import com.nextstepai.paperless.ui.components.LoadingState
 import com.nextstepai.paperless.ui.theme.PaperlessDimensions
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -96,16 +108,17 @@ fun DocumentsScreen(
     onEvent: (DocumentsUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selected = state.selected
     val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
 
-    if (compact && state.selected != null) {
+    if (compact && selected != null) {
         Scaffold(
             modifier = modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
                     title = {
                         Text(
-                            state.selected.title.ifBlank { "Document" },
+                            selected.title.ifBlank { "Document" },
                             maxLines = 1
                         )
                     },
@@ -119,7 +132,7 @@ fun DocumentsScreen(
         ) { padding ->
             DocumentDetails(
                 state = state,
-                selected = state.selected,
+                selected = selected,
                 onEvent = onEvent,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 showTopBar = false,
@@ -128,16 +141,19 @@ fun DocumentsScreen(
         return
     }
 
-    val scaffoldState = calculateListDetailPaneScaffoldState(
-        currentPaneDestination = if (state.selected == null) {
-            ListDetailPaneScaffoldRole.List
+    val navigator = rememberListDetailPaneScaffoldNavigator<Nothing>()
+    val currentSelectedId = state.selectedId
+    LaunchedEffect(currentSelectedId) {
+        if (currentSelectedId != null) {
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail)
         } else {
-            ListDetailPaneScaffoldRole.Detail
+            navigator.navigateTo(ListDetailPaneScaffoldRole.List)
         }
-    )
+    }
 
     ListDetailPaneScaffold(
-        scaffoldState = scaffoldState,
+        directive = navigator.scaffoldDirective,
+        value = navigator.scaffoldValue,
         modifier = modifier.fillMaxSize(),
         listPane = {
             AnimatedPane {
@@ -151,7 +167,7 @@ fun DocumentsScreen(
         },
         detailPane = {
             AnimatedPane {
-                state.selected?.let {
+                selected?.let {
                     DocumentDetails(
                         state = state,
                         selected = it,
@@ -440,15 +456,33 @@ private fun ModernDocumentCard(
 
 @Composable
 private fun SyncBadge(syncState: String) {
+    val isError = syncState.equals("FAILED", true) || syncState.equals("CONFLICT", true) || syncState.equals("ERROR", true)
     AssistChip(
         onClick = {},
         enabled = false,
         label = {
             Text(syncState.lowercase().replaceFirstChar { it.uppercase() })
-        }
+        },
+        leadingIcon = if (isError) {
+            {
+                Icon(
+                    Icons.Outlined.ErrorOutline,
+                    contentDescription = "Sync error",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        } else null,
+        colors = if (isError) {
+            AssistChipDefaults.assistChipColors(
+                disabledContainerColor = MaterialTheme.colorScheme.errorContainer,
+                disabledLabelColor = MaterialTheme.colorScheme.onErrorContainer
+            )
+        } else AssistChipDefaults.assistChipColors()
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DocumentDetails(
     state: DocumentsUiState,
@@ -462,10 +496,13 @@ private fun DocumentDetails(
     val clipboard = LocalClipboardManager.current
 
     val dirty = state.editTitle != selected.title ||
+        state.editCreatedDate != selected.createdInput ||
         state.editExpiry != selected.expiryInput ||
+        state.editArchiveSerialNumber != selected.archiveSerialNumber?.toString().orEmpty() ||
         state.editReminderDays != (selected.reminderDaysBeforeExpiry ?: 30).toString() ||
         state.selectedCorrespondentId != selected.correspondentId ||
         state.selectedDocumentTypeId != selected.documentTypeId ||
+        state.selectedStoragePathId != selected.storagePathId ||
         state.selectedTagIds != selected.tagIds ||
         state.customFieldValues != state.initialCustomFieldValues
 
@@ -522,6 +559,50 @@ private fun DocumentDetails(
             ),
             verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.lg)
         ) {
+            if (selected.syncState.equals("FAILED", true) || selected.syncState.equals("CONFLICT", true) || selected.syncState.equals("ERROR", true) || selected.lastSyncError != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(PaperlessDimensions.lg),
+                            verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(Modifier.width(PaperlessDimensions.sm))
+                                Text(
+                                    if (selected.syncState.equals("CONFLICT", true)) "Sync Conflict" else "Sync Error",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            Text(
+                                selected.lastSyncError?.ifBlank { "Synchronization failed. Check your network or server connection." }
+                                    ?: "Synchronization failed. Check your network or server connection.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            FilledTonalButton(
+                                onClick = { onEvent(DocumentsUiEvent.RetrySync(selected.id)) },
+                                colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.onError,
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = null)
+                                Spacer(Modifier.width(PaperlessDimensions.sm))
+                                Text("Retry sync")
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 DocumentHeader(selected)
             }
@@ -536,35 +617,92 @@ private fun DocumentDetails(
                         singleLine = true
                     )
                     Spacer(Modifier.height(PaperlessDimensions.md))
-                    CatalogDropdown(
+                    SearchableCatalogDropdown(
                         title = "Correspondent",
                         selectedId = state.selectedCorrespondentId,
                         items = state.correspondents.map { it.id to it.name },
-                        onSelect = { onEvent(DocumentsUiEvent.CorrespondentChanged(it)) }
+                        onSelect = { onEvent(DocumentsUiEvent.CorrespondentChanged(it)) },
+                        onAddNew = { onEvent(DocumentsUiEvent.ToggleAddCorrespondentDialog(true)) }
                     )
                     Spacer(Modifier.height(PaperlessDimensions.md))
-                    CatalogDropdown(
+                    SearchableCatalogDropdown(
                         title = "Document type",
                         selectedId = state.selectedDocumentTypeId,
                         items = state.documentTypes.map { it.id to it.name },
-                        onSelect = { onEvent(DocumentsUiEvent.DocumentTypeChanged(it)) }
+                        onSelect = { onEvent(DocumentsUiEvent.DocumentTypeChanged(it)) },
+                        onAddNew = { onEvent(DocumentsUiEvent.ToggleAddDocumentTypeDialog(true)) }
+                    )
+                    Spacer(Modifier.height(PaperlessDimensions.md))
+                    SearchableCatalogDropdown(
+                        title = "Storage path",
+                        selectedId = state.selectedStoragePathId,
+                        items = state.storagePaths.map { it.id to it.name },
+                        onSelect = { onEvent(DocumentsUiEvent.StoragePathChanged(it)) },
+                        onAddNew = { onEvent(DocumentsUiEvent.ToggleAddStoragePathDialog(true)) }
+                    )
+                    Spacer(Modifier.height(PaperlessDimensions.md))
+                    OutlinedTextField(
+                        value = state.editArchiveSerialNumber,
+                        onValueChange = { onEvent(DocumentsUiEvent.ArchiveSerialNumberChanged(it)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Archive serial number (ASN)") },
+                        placeholder = { Text("e.g. 10042") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
                     )
                 }
             }
 
             item {
-                DetailCard(title = "Expiry & reminders", icon = Icons.Outlined.CalendarMonth) {
+                DetailCard(title = "Dates & reminders", icon = Icons.Outlined.CalendarMonth) {
+                    OutlinedTextField(
+                        value = state.editCreatedDate,
+                        onValueChange = {},
+                        modifier = Modifier.fillMaxWidth().clickable { onEvent(DocumentsUiEvent.ToggleCreatedDatePicker(true)) },
+                        enabled = false,
+                        readOnly = true,
+                        label = { Text("Document date") },
+                        placeholder = { Text("YYYY-MM-DD") },
+                        trailingIcon = {
+                            IconButton(onClick = { onEvent(DocumentsUiEvent.ToggleCreatedDatePicker(true)) }) {
+                                Icon(Icons.Outlined.CalendarMonth, contentDescription = "Select document date")
+                            }
+                        },
+                        singleLine = true,
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledTrailingIconColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    Spacer(Modifier.height(PaperlessDimensions.md))
+
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.md)
                     ) {
                         OutlinedTextField(
                             value = state.editExpiry,
-                            onValueChange = { onEvent(DocumentsUiEvent.ExpiryChanged(it)) },
-                            modifier = Modifier.weight(1f),
+                            onValueChange = {},
+                            modifier = Modifier.weight(1f).clickable { onEvent(DocumentsUiEvent.ToggleExpiryDatePicker(true)) },
+                            enabled = false,
+                            readOnly = true,
                             label = { Text("Expiry date") },
                             placeholder = { Text("YYYY-MM-DD") },
-                            singleLine = true
+                            trailingIcon = {
+                                IconButton(onClick = { onEvent(DocumentsUiEvent.ToggleExpiryDatePicker(true)) }) {
+                                    Icon(Icons.Outlined.CalendarMonth, contentDescription = "Select expiry date")
+                                }
+                            },
+                            singleLine = true,
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.primary
+                            )
                         )
                         OutlinedTextField(
                             value = state.editReminderDays,
@@ -572,6 +710,7 @@ private fun DocumentDetails(
                             modifier = Modifier.weight(1f),
                             label = { Text("Reminder days") },
                             leadingIcon = { Icon(Icons.Outlined.Notifications, null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
                         )
                     }
@@ -594,13 +733,10 @@ private fun DocumentDetails(
                     DetailCard(title = "Custom fields", icon = Icons.Outlined.Label) {
                         Column(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.md)) {
                             state.customFields.forEach { field ->
-                                OutlinedTextField(
+                                CustomFieldInput(
+                                    field = field,
                                     value = state.customFieldValues[field.id].orEmpty(),
-                                    onValueChange = { onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    label = { Text(field.name) },
-                                    supportingText = { Text(field.type.name.lowercase().replace('_', ' ')) },
-                                    minLines = if (field.type.name == "LONG_TEXT") 3 else 1
+                                    onValueChange = { onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it)) }
                                 )
                             }
                         }
@@ -681,6 +817,48 @@ private fun DocumentDetails(
         }
     }
 
+    if (state.showCreatedDatePicker) {
+        PaperlessDatePickerDialog(
+            title = "Document date",
+            initialDateString = state.editCreatedDate,
+            onDateSelected = { onEvent(DocumentsUiEvent.CreatedDateChanged(it)) },
+            onDismiss = { onEvent(DocumentsUiEvent.ToggleCreatedDatePicker(false)) }
+        )
+    }
+
+    if (state.showExpiryDatePicker) {
+        PaperlessDatePickerDialog(
+            title = "Expiry date",
+            initialDateString = state.editExpiry,
+            onDateSelected = { onEvent(DocumentsUiEvent.ExpiryChanged(it)) },
+            onDismiss = { onEvent(DocumentsUiEvent.ToggleExpiryDatePicker(false)) }
+        )
+    }
+
+    if (state.showAddCorrespondentDialog) {
+        AddItemDialog(
+            title = "Correspondent",
+            onConfirm = { onEvent(DocumentsUiEvent.AddCorrespondent(it)) },
+            onDismiss = { onEvent(DocumentsUiEvent.ToggleAddCorrespondentDialog(false)) }
+        )
+    }
+
+    if (state.showAddDocumentTypeDialog) {
+        AddItemDialog(
+            title = "Document type",
+            onConfirm = { onEvent(DocumentsUiEvent.AddDocumentType(it)) },
+            onDismiss = { onEvent(DocumentsUiEvent.ToggleAddDocumentTypeDialog(false)) }
+        )
+    }
+
+    if (state.showAddStoragePathDialog) {
+        AddItemDialog(
+            title = "Storage path",
+            onConfirm = { onEvent(DocumentsUiEvent.AddStoragePath(it)) },
+            onDismiss = { onEvent(DocumentsUiEvent.ToggleAddStoragePathDialog(false)) }
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -700,6 +878,168 @@ private fun DocumentDetails(
             }
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PaperlessDatePickerDialog(
+    title: String,
+    initialDateString: String,
+    onDateSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val initialMillis = remember(initialDateString) {
+        initialDateString.trim().takeIf { it.isNotBlank() }?.let {
+            runCatching {
+                LocalDate.parse(it).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+            }.getOrNull()
+        } ?: kotlin.time.Clock.System.now().toEpochMilliseconds()
+    }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedMs = datePickerState.selectedDateMillis
+                    if (selectedMs != null) {
+                        val formatted = Instant.fromEpochMilliseconds(selectedMs)
+                            .toLocalDateTime(TimeZone.UTC)
+                            .date
+                            .toString()
+                        onDateSelected(formatted)
+                    }
+                    onDismiss()
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    ) {
+        DatePicker(
+            state = datePickerState,
+            title = { Text(title, modifier = Modifier.padding(start = 24.dp, top = 16.dp)) }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchableCatalogDropdown(
+    title: String,
+    selectedId: Long?,
+    items: List<Pair<Long, String>>,
+    onSelect: (Long?) -> Unit,
+    onAddNew: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedLabel = items.firstOrNull { it.first == selectedId }?.second ?: "None"
+
+    val filteredItems = remember(items, searchQuery) {
+        if (searchQuery.isBlank()) items
+        else items.filter { it.second.contains(searchQuery, ignoreCase = true) }
+    }
+
+    Box {
+        OutlinedButton(
+            onClick = {
+                searchQuery = ""
+                expanded = true
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Text(title, style = MaterialTheme.typography.labelMedium)
+                Text(selectedLabel)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = PaperlessDimensions.sm, vertical = PaperlessDimensions.xs),
+                placeholder = { Text("Search " + title.lowercase()) },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Outlined.Search, null) }
+            )
+            DropdownMenuItem(
+                text = { Text("None") },
+                onClick = {
+                    expanded = false
+                    onSelect(null)
+                }
+            )
+            HorizontalDivider()
+            filteredItems.forEach { (id, name) ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = {
+                        expanded = false
+                        onSelect(id)
+                    }
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(PaperlessDimensions.sm))
+                        Text("Add new " + title.lowercase(), color = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                onClick = {
+                    expanded = false
+                    onAddNew()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddItemDialog(
+    title: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add new " + title.lowercase()) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(title + " name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(name)
+                    }
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -765,51 +1105,6 @@ private fun DetailCard(
                 content()
             }
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CatalogDropdown(
-    title: String,
-    selectedId: Long?,
-    items: List<Pair<Long, String>>,
-    onSelect: (Long?) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = items.firstOrNull { it.first == selectedId }?.second ?: "None"
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                Text(title, style = MaterialTheme.typography.labelMedium)
-                Text(selectedLabel)
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("None") },
-                onClick = {
-                    expanded = false
-                    onSelect(null)
-                }
-            )
-            items.forEach { (id, name) ->
-                DropdownMenuItem(
-                    text = { Text(name) },
-                    onClick = {
-                        expanded = false
-                        onSelect(id)
-                    }
-                )
-            }
-        }
     }
 }
 

@@ -4,16 +4,23 @@ package com.nextstepai.paperless.documents.data
 
 import androidx.room.RoomRawQuery
 import com.nextstepai.paperless.database.dao.DocumentDao
+import com.nextstepai.paperless.database.dao.SyncOperationDao
 import com.nextstepai.paperless.database.entity.DocumentEntity
 import com.nextstepai.paperless.database.mapper.*
 import com.nextstepai.paperless.domain.model.*
 import com.nextstepai.paperless.domain.repository.DocumentRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
-class RoomDocumentRepository(private val dao: DocumentDao) : DocumentRepository {
+class RoomDocumentRepository(
+    private val dao: DocumentDao,
+    private val syncOpDao: SyncOperationDao? = null
+) : DocumentRepository {
     override fun observeDocuments(): Flow<List<Document>> = dao.observeAll().map { it.map(DocumentEntity::toDomain) }
     override fun observeDocument(id: Long): Flow<DocumentWithRelations?> = dao.observeWithRelations(id).map { it?.toDomain() }
+    override fun observeLatestSyncError(documentId: Long): Flow<String?> =
+        syncOpDao?.observeLatestForDocument(documentId)?.map { it?.lastError } ?: flowOf(null)
     override fun observeExpiring(beforeEpochMillis: Long): Flow<List<Document>> = dao.observeExpiring(beforeEpochMillis).map { it.map(DocumentEntity::toDomain) }
     override suspend fun getByChecksum(checksum: String): Document? = dao.findByChecksum(checksum)?.toDomain()
     override suspend fun getById(id: Long): Document? = dao.findById(id)?.toDomain()
@@ -22,7 +29,7 @@ class RoomDocumentRepository(private val dao: DocumentDao) : DocumentRepository 
     override suspend fun delete(id: Long) = dao.softDelete(id, kotlin.time.Clock.System.now().toEpochMilliseconds())
     override suspend fun markSynced(id: Long, remoteId: String, serverVersion: Long, syncedModified: Long) = dao.markSynced(id, remoteId, serverVersion, kotlin.time.Clock.System.now().toEpochMilliseconds(), syncedModified)
     override suspend fun markSyncState(id: Long, state: String, error: String?) = dao.markSyncState(id, state)
-    override suspend fun updateMetadata(id: Long, title: String, expiresAt: Long?, reminderDaysBeforeExpiry: Int?) = dao.updateMetadata(id, title, expiresAt, reminderDaysBeforeExpiry, kotlin.time.Clock.System.now().toEpochMilliseconds())
+    override suspend fun updateMetadata(id: Long, title: String, created: Long, archiveSerialNumber: Long?, expiresAt: Long?, reminderDaysBeforeExpiry: Int?) = dao.updateMetadata(id, title, created, archiveSerialNumber, expiresAt, reminderDaysBeforeExpiry, kotlin.time.Clock.System.now().toEpochMilliseconds())
     override suspend fun search(query: String): List<Document> {
         val parts = query.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return emptyList()
