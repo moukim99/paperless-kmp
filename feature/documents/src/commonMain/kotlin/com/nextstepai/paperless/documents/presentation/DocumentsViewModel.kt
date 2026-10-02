@@ -31,12 +31,15 @@ data class DocumentUiModel(
     val tagIds: Set<Long>,
     val expiryState: ExpiryState = ExpiryState.None,
     val expiryLabel: String? = null,
+    val expiryInput: String = "",
 ) {
     companion object {
         fun fromDomain(d: Document, tagIds: Set<Long> = emptySet()): DocumentUiModel {
             val expiry = d.expiresAt?.toEpochMilliseconds()
+            val now = Clock.System.now().toEpochMilliseconds()
+            val expiryInput = d.expiresAt?.toLocalDateTime(TimeZone.UTC)?.date?.toString().orEmpty()
             val state = expiry?.let {
-                val days = ((it - Clock.System.now().toEpochMilliseconds()) / 86_400_000L).toInt()
+                val days = ((it - now) / 86_400_000L).toInt()
                 when {
                     days < 0 -> ExpiryState.Expired
                     days == 0 -> ExpiryState.Today
@@ -44,7 +47,7 @@ data class DocumentUiModel(
                 }
             } ?: ExpiryState.None
             val label = expiry?.let {
-                val days = ((it - Clock.System.now().toEpochMilliseconds()) / 86_400_000L).toInt()
+                val days = ((it - now) / 86_400_000L).toInt()
                 when {
                     days < 0 -> "Expired"
                     days == 0 -> "Expires today"
@@ -55,7 +58,7 @@ data class DocumentUiModel(
             return DocumentUiModel(
                 d.id, d.title, d.created.toEpochMilliseconds(), expiry, d.pageCount, d.mimeType,
                 d.syncState, d.content, d.filename, d.reminderDaysBeforeExpiry, d.correspondentId,
-                d.documentTypeId, tagIds, state, label
+                d.documentTypeId, tagIds, state, label, expiryInput
             )
         }
     }
@@ -150,7 +153,7 @@ class DocumentsViewModel(
             val d = rel.document
             val ui = DocumentUiModel.fromDomain(d, rel.tags.map(Tag::id).toSet())
             val values = catalog.observeCustomFieldValues(id).first().associate { it.fieldId to (it.text ?: it.longText ?: it.select ?: it.boolean?.toString() ?: it.int?.toString() ?: it.float?.toString() ?: it.monetary ?: "") }
-            _state.update { it.copy(selectedId=id, selected=ui, editTitle=ui.title, editExpiry=ui.expiresAtEpochMillis?.let { m -> Instant.fromEpochMilliseconds(m).toString().take(10) } ?: "", editReminderDays=(ui.reminderDaysBeforeExpiry ?: 30).toString(), selectedCorrespondentId=rel.correspondent?.id, selectedDocumentTypeId=rel.documentType?.id, selectedTagIds=ui.tagIds, customFieldValues=values, initialCustomFieldValues=values) }
+            _state.update { it.copy(selectedId=id, selected=ui, editTitle=ui.title, editExpiry=ui.expiryInput, editReminderDays=(ui.reminderDaysBeforeExpiry ?: 30).toString(), selectedCorrespondentId=rel.correspondent?.id, selectedDocumentTypeId=rel.documentType?.id, selectedTagIds=ui.tagIds, customFieldValues=values, initialCustomFieldValues=values) }
         }
     }
     private fun saveMetadata() = scope.launch {
