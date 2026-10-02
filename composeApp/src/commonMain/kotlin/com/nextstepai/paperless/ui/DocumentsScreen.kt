@@ -47,23 +47,16 @@ fun DocumentsScreen(state: DocumentsUiState, onEvent: (DocumentsUiEvent) -> Unit
         return
     }
 
-    val directive = androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective(adaptiveInfo)
-    val value = androidx.compose.material3.adaptive.layout.calculateThreePaneScaffoldValue(
-        maxHorizontalPartitions = if (compact) 1 else 2,
-        adaptStrategies = androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldDefaults.adaptStrategies(),
-        currentDestination = state.selected?.let {
-            androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem(
-                androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole.Detail,
-                it.id
-            )
-        } ?: androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem(
+    val scaffoldState = androidx.compose.material3.adaptive.layout.calculateListDetailPaneScaffoldState(
+        currentPaneDestination = if (state.selected == null) {
             androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole.List
-        )
+        } else {
+            androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole.Detail
+        }
     )
 
     androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold(
-        directive = directive,
-        value = value,
+        scaffoldState = scaffoldState,
         modifier = Modifier.fillMaxSize(),
         listPane = {
             androidx.compose.material3.adaptive.layout.AnimatedPane {
