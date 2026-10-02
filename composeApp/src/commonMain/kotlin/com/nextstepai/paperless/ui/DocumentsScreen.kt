@@ -17,34 +17,54 @@ import com.nextstepai.paperless.platform.DocumentPickerButton
 import com.nextstepai.paperless.platform.DocumentScannerButton
 import com.nextstepai.paperless.ui.components.*
 
+@OptIn(androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun DocumentsScreen(state: DocumentsUiState, onEvent: (DocumentsUiEvent) -> Unit) {
-    val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
-    var showDetails by remember { mutableStateOf(false) }
-    if (compact) {
-        if (showDetails && state.selected != null) {
-            Scaffold(topBar = {
-                TopAppBar(
-                    title = { Text("Document") },
-                    navigationIcon = { TextButton(onClick = { showDetails = false }) { Text("Back") } }
+    val navigator = androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator<Long>()
+    val scope = rememberCoroutineScope()
+    val selectedKey = navigator.currentDestination?.contentKey
+
+    androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold(
+        navigator = navigator,
+        modifier = Modifier.fillMaxSize(),
+        listPane = {
+            androidx.compose.material3.adaptive.layout.AnimatedPane {
+                DocumentsList(
+                    state = state,
+                    onEvent = onEvent,
+                    onSelect = { id ->
+                        onEvent(DocumentsUiEvent.Select(id))
+                        scope.launch {
+                            navigator.navigateTo(
+                                pane = androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole.Detail,
+                                contentKey = id,
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
                 )
-            }) { p -> DocumentDetails(state, state.selected, onEvent, Modifier.fillMaxSize().padding(p)) }
-        } else {
-            DocumentsList(state, onEvent, {
-                onEvent(DocumentsUiEvent.Select(it))
-                showDetails = true
-            })
-        }
-    } else {
-        Row(Modifier.fillMaxSize()) {
-            DocumentsList(state, onEvent, { onEvent(DocumentsUiEvent.Select(it)) }, Modifier.weight(.42f))
-            VerticalDivider()
-            Box(Modifier.weight(.58f).fillMaxSize()) {
-                state.selected?.let { DocumentDetails(state, it, onEvent, Modifier.fillMaxSize()) }
-                    ?: EmptyState("Select a document", "Choose a document from the list to view its details.")
             }
-        }
-    }
+        },
+        detailPane = {
+            androidx.compose.material3.adaptive.layout.AnimatedPane {
+                val selected = state.selected
+                    ?: selectedKey?.let { key -> state.documents.firstOrNull { it.id == key } }
+                if (selected != null) {
+                    DocumentDetails(
+                        state = state,
+                        selected = selected,
+                        onEvent = onEvent,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    EmptyState(
+                        "Select a document",
+                        "Choose a document from the list to view its details.",
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
