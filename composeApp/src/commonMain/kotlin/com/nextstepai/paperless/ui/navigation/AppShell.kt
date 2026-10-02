@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.window.core.layout.WindowWidthSizeClass
 import com.nextstepai.paperless.documents.presentation.DocumentsUiEvent
@@ -35,7 +36,7 @@ fun AppShell(
                 }
             },
         ) { padding ->
-            Surface(Modifier.fillMaxSize()) {
+            Surface(Modifier.fillMaxSize().padding(padding)) {
                 AppDestinationContent(destination, state, onEvent)
             }
         }
