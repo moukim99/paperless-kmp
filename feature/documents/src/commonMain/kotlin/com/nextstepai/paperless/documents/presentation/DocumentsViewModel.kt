@@ -98,9 +98,10 @@ class DocumentsViewModel(
     private val scope: CoroutineScope
 ) {
     private val _state = MutableStateFlow(DocumentsUiState())
+    private var searchJob: Job? = null
     val state: StateFlow<DocumentsUiState> = _state.asStateFlow()
     init {
-        scope.launch { repository.observeDocuments().collectLatest { docs -> _state.update { state -> state.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }, loading = false) } } }
+        scope.launch { repository.observeDocuments().collectLatest { docs -> _state.update { state -> if (state.query.isBlank()) state.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }, loading = false) else state.copy(loading = false) } } }
         scope.launch { catalog.observeCorrespondents().collect { v -> _state.update { it.copy(correspondents = v) } } }
         scope.launch { catalog.observeDocumentTypes().collect { v -> _state.update { it.copy(documentTypes = v) } } }
         scope.launch { catalog.observeTags().collect { v -> _state.update { it.copy(tags = v) } } }
@@ -108,7 +109,25 @@ class DocumentsViewModel(
     }
     fun onEvent(event: DocumentsUiEvent) {
         when (event) {
-            is DocumentsUiEvent.SearchChanged -> { _state.update { it.copy(query = event.value, error = null) }; scope.launch { runCatching { repository.search(event.value) }.onSuccess { docs -> _state.update { it.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } } }
+            is DocumentsUiEvent.SearchChanged -> {
+                _state.update { it.copy(query = event.value, error = null) }
+                searchJob?.cancel()
+                searchJob = scope.launch {
+                    delay(250)
+                    if (event.value.isBlank()) return@launch
+                    runCatching { repository.search(event.value) }
+                        .onSuccess { docs ->
+                            if (_state.value.query == event.value) {
+                                _state.update { it.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }) }
+                            }
+                        }
+                        .onFailure { e ->
+                            if (_state.value.query == event.value) {
+                                _state.update { it.copy(error = e.message) }
+                            }
+                        }
+                }
+            }
             is DocumentsUiEvent.Select -> select(event.id)
             DocumentsUiEvent.ClearSelection -> _state.update { it.copy(selectedId = null, selected = null) }
             is DocumentsUiEvent.Delete -> scope.launch { runCatching { delete(event.id); if (_state.value.selectedId == event.id) _state.update { it.copy(selectedId = null, selected = null) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } }
