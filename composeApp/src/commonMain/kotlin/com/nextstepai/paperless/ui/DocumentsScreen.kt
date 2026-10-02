@@ -1,108 +1,47 @@
 package com.nextstepai.paperless.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.lazy.LazyColumn
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import com.nextstepai.paperless.documents.presentation.DocumentUiModel
-import com.nextstepai.paperless.documents.presentation.DocumentsUiEvent
-import com.nextstepai.paperless.documents.presentation.DocumentsUiState
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.window.core.layout.WindowWidthSizeClass
+import com.nextstepai.paperless.documents.presentation.*
 import com.nextstepai.paperless.platform.DocumentPickerButton
 import com.nextstepai.paperless.platform.DocumentScannerButton
-
-private val MobileBreakpoint = 700.dp
+import com.nextstepai.paperless.ui.components.*
 
 @Composable
-fun DocumentsScreen(
-    state: DocumentsUiState,
-    onEvent: (DocumentsUiEvent) -> Unit
-) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val isMobile = maxWidth < MobileBreakpoint
-        var showDetails by remember { mutableStateOf(false) }
-
-        LaunchedEffect(state.selectedId) {
-            if (state.selectedId == null) showDetails = false
-        }
-
-        if (isMobile) {
-            if (showDetails && state.selected != null) {
-                DocumentDetailsScreen(
-                    state = state,
-                    selected = state.selected,
-                    onEvent = onEvent,
-                    onBack = { showDetails = false }
+fun DocumentsScreen(state: DocumentsUiState, onEvent: (DocumentsUiEvent) -> Unit) {
+    val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
+    var showDetails by remember { mutableStateOf(false) }
+    if (compact) {
+        if (showDetails && state.selected != null) {
+            Scaffold(topBar = {
+                TopAppBar(
+                    title = { Text("Document") },
+                    navigationIcon = { TextButton(onClick = { showDetails = false }) { Text("Back") } }
                 )
-            } else {
-                DocumentsList(
-                    state = state,
-                    onEvent = onEvent,
-                    onSelect = {
-                        onEvent(DocumentsUiEvent.Select(it))
-                        showDetails = true
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            }) { p -> DocumentDetails(state, state.selected, onEvent, Modifier.fillMaxSize().padding(p)) }
         } else {
-            Row(
-                Modifier.fillMaxSize().padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                DocumentsList(
-                    state = state,
-                    onEvent = onEvent,
-                    onSelect = { onEvent(DocumentsUiEvent.Select(it)) },
-                    modifier = Modifier.weight(0.42f).fillMaxHeight()
-                )
-                VerticalDivider()
-                Box(
-                    Modifier.weight(0.58f).fillMaxHeight()
-                ) {
-                    state.selected?.let {
-                        DocumentDetails(
-                            state = state,
-                            selected = it,
-                            onEvent = onEvent,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } ?: EmptySelection()
-                }
+            DocumentsList(state, onEvent, {
+                onEvent(DocumentsUiEvent.Select(it))
+                showDetails = true
+            })
+        }
+    } else {
+        Row(Modifier.fillMaxSize()) {
+            DocumentsList(state, onEvent, { onEvent(DocumentsUiEvent.Select(it)) }, Modifier.weight(.42f))
+            VerticalDivider()
+            Box(Modifier.weight(.58f).fillMaxSize()) {
+                state.selected?.let { DocumentDetails(state, it, onEvent, Modifier.fillMaxSize()) }
+                    ?: EmptyState("Select a document", "Choose a document from the list to view its details.")
             }
         }
     }
@@ -113,120 +52,99 @@ private fun DocumentsList(
     state: DocumentsUiState,
     onEvent: (DocumentsUiEvent) -> Unit,
     onSelect: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
-        TopAppBar(title = { Text("Documents") })
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-        ) {
+    var addOpen by remember { mutableStateOf(false) }
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { TopAppBar(title = { Text("Documents") }) },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { addOpen = true }) { Text("+", style = MaterialTheme.typography.headlineSmall) }
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
             OutlinedTextField(
                 value = state.query,
                 onValueChange = { onEvent(DocumentsUiEvent.SearchChanged(it)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 label = { Text("Search documents") },
+                supportingText = { Text("tag: · type: · correspondent: · after: · before: · expiry:") },
                 singleLine = true
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                DocumentPickerButton { onEvent(DocumentsUiEvent.Import(it)) }
-                DocumentScannerButton { onEvent(DocumentsUiEvent.Import(it)) }
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp))
             }
             if (state.importing) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 4.dp)
+            when {
+                state.loading -> LoadingState(Modifier.fillMaxSize())
+                state.documents.isEmpty() -> EmptyState(
+                    if (state.query.isBlank()) "No documents yet" else "No matching documents",
+                    if (state.query.isBlank()) "Add a file or scan a document to build your library." else "Try a different search or filter."
                 )
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        when {
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            state.documents.isEmpty() -> EmptyDocumentsState()
-            else -> LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
-            ) {
-                items(state.documents, key = { it.id }) { doc ->
-                    DocumentListItem(
-                        document = doc,
-                        selected = doc.id == state.selectedId,
-                        onClick = { onSelect(doc.id) }
-                    )
+                else -> LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(state.documents, key = { it.id }) { doc ->
+                        DocumentCard(
+                            document = doc,
+                            correspondent = state.correspondents.firstOrNull { it.id == doc.correspondentId }?.name,
+                            selected = doc.id == state.selectedId,
+                            onClick = { onSelect(doc.id) }
+                        )
+                    }
                 }
             }
         }
     }
+    if (addOpen) {
+        AlertDialog(
+            onDismissRequest = { addOpen = false },
+            title = { Text("Add document") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DocumentPickerButton { addOpen = false; onEvent(DocumentsUiEvent.Import(it)) }
+                    DocumentScannerButton { addOpen = false; onEvent(DocumentsUiEvent.Import(it)) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { addOpen = false }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
-private fun DocumentListItem(
+private fun DocumentCard(
     document: DocumentUiModel,
+    correspondent: String?,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     ElevatedCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = if (selected) {
-            CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
-        } else CardDefaults.elevatedCardColors()
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow
+        )
     ) {
-        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(document.title.ifBlank { "Untitled document" }, style = MaterialTheme.typography.titleMedium)
+            correspondent?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Spacer(Modifier.height(8.dp))
             Text(
-                document.title.ifBlank { "Untitled document" },
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                document.filename ?: document.mimeType,
+                document.mimeType.substringAfterLast('/').uppercase() + " · " + (document.pageCount ?: 1) + " pages",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(document.syncState, style = MaterialTheme.typography.labelSmall)
-                document.expiresAtEpochMillis?.let {
-                    Text("Expires: ${formatEpochDate(it)}", style = MaterialTheme.typography.labelSmall)
-                }
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AssistChip(onClick = {}, enabled = false, label = {
+                    Text(document.syncState.lowercase().replaceFirstChar { it.uppercase() })
+                })
+                document.expiryLabel?.let { ExpiryBadge(document.expiryState, it) }
             }
         }
-    }
-}
-
-@Composable
-private fun DocumentDetailsScreen(
-    state: DocumentsUiState,
-    selected: DocumentUiModel,
-    onEvent: (DocumentsUiEvent) -> Unit,
-    onBack: () -> Unit
-) {
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Document details") },
-            navigationIcon = {
-                TextButton(onClick = onBack) { Text("Back") }
-            }
-        )
-        DocumentDetails(
-            state = state,
-            selected = selected,
-            onEvent = onEvent,
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }
 
@@ -237,15 +155,31 @@ private fun DocumentDetails(
     onEvent: (DocumentsUiEvent) -> Unit,
     modifier: Modifier
 ) {
+    var confirmDelete by remember(selected.id) { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val originalExpiry = selected.expiresAtEpochMillis?.let {
+        kotlinx.datetime.Instant.fromEpochMilliseconds(it).toString().take(10)
+    }.orEmpty()
+    val dirty = state.editTitle != selected.title ||
+        state.editExpiry != originalExpiry ||
+        state.editReminderDays != (selected.reminderDaysBeforeExpiry ?: 30).toString() ||
+        state.selectedCorrespondentId != selected.correspondentId ||
+        state.selectedDocumentTypeId != selected.documentTypeId
+
     LazyColumn(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            horizontal = 16.dp,
-            vertical = 12.dp
-        )
+        modifier,
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
+            Text(selected.title.ifBlank { "Untitled document" }, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                selected.mimeType.substringAfterLast('/').uppercase() + " · " + (selected.pageCount ?: 1) + " pages",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            selected.expiryLabel?.let { ExpiryBadge(selected.expiryState, it) }
+
+            SectionHeader("Information")
             OutlinedTextField(
                 value = state.editTitle,
                 onValueChange = { onEvent(DocumentsUiEvent.TitleChanged(it)) },
@@ -253,7 +187,14 @@ private fun DocumentDetails(
                 label = { Text("Title") },
                 singleLine = true
             )
-            Spacer(Modifier.height(8.dp))
+            CatalogChips("Correspondent", state.selectedCorrespondentId, state.correspondents.map { it.id to it.name }) {
+                onEvent(DocumentsUiEvent.CorrespondentChanged(it))
+            }
+            CatalogChips("Document type", state.selectedDocumentTypeId, state.documentTypes.map { it.id to it.name }) {
+                onEvent(DocumentsUiEvent.DocumentTypeChanged(it))
+            }
+
+            SectionHeader("Expiry")
             OutlinedTextField(
                 value = state.editExpiry,
                 onValueChange = { onEvent(DocumentsUiEvent.ExpiryChanged(it)) },
@@ -261,7 +202,6 @@ private fun DocumentDetails(
                 label = { Text("Expiry date (YYYY-MM-DD)") },
                 singleLine = true
             )
-            Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.editReminderDays,
                 onValueChange = { onEvent(DocumentsUiEvent.ReminderDaysChanged(it)) },
@@ -269,54 +209,10 @@ private fun DocumentDetails(
                 label = { Text("Reminder days before expiry") },
                 singleLine = true
             )
-            Spacer(Modifier.height(12.dp))
-            Text("Correspondent", style = MaterialTheme.typography.titleSmall)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                FilterChip(
-                    selected = state.selectedCorrespondentId == null,
-                    onClick = { onEvent(DocumentsUiEvent.CorrespondentChanged(null)) },
-                    label = { Text("None") }
-                )
-                state.correspondents.take(16).forEach { item ->
-                    FilterChip(
-                        selected = state.selectedCorrespondentId == item.id,
-                        onClick = { onEvent(DocumentsUiEvent.CorrespondentChanged(item.id)) },
-                        label = { Text(item.name) }
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Text("Document type", style = MaterialTheme.typography.titleSmall)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                FilterChip(
-                    selected = state.selectedDocumentTypeId == null,
-                    onClick = { onEvent(DocumentsUiEvent.DocumentTypeChanged(null)) },
-                    label = { Text("None") }
-                )
-                state.documentTypes.take(16).forEach { item ->
-                    FilterChip(
-                        selected = state.selectedDocumentTypeId == item.id,
-                        onClick = { onEvent(DocumentsUiEvent.DocumentTypeChanged(item.id)) },
-                        label = { Text(item.name) }
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Text("Tags", style = MaterialTheme.typography.titleSmall)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                state.tags.take(24).forEach { tag ->
+
+            SectionHeader("Tags")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                state.tags.take(32).forEach { tag ->
                     FilterChip(
                         selected = tag.id in state.selectedTagIds,
                         onClick = { onEvent(DocumentsUiEvent.TagToggled(tag.id)) },
@@ -324,86 +220,78 @@ private fun DocumentDetails(
                     )
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Button(
-                    onClick = { onEvent(DocumentsUiEvent.SaveMetadata) },
-                    enabled = !state.saving
-                ) {
-                    Text(if (state.saving) "Saving…" else "Save")
-                }
-                OutlinedButton(onClick = { onEvent(DocumentsUiEvent.OpenFile) }) {
-                    Text("Open file")
-                }
-                OutlinedButton(onClick = { onEvent(DocumentsUiEvent.Delete(selected.id)) }) {
-                    Text("Delete")
+
+            SectionHeader("Actions")
+            if (dirty) {
+                Text("Unsaved changes", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { onEvent(DocumentsUiEvent.SaveMetadata) }, enabled = !state.saving) {
+                    Text(if (state.saving) "Saving…" else "Save changes")
                 }
             }
+            TextButton(onClick = { onEvent(DocumentsUiEvent.OpenFile) }) { Text("Open document") }
+            TextButton(onClick = { confirmDelete = true }) {
+                Text("Delete document", color = MaterialTheme.colorScheme.error)
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text("Custom fields", style = MaterialTheme.typography.titleMedium)
+            SectionHeader("Custom fields")
         }
 
         items(state.customFields, key = { it.id }) { field ->
             OutlinedTextField(
                 value = state.customFieldValues[field.id].orEmpty(),
-                onValueChange = {
-                    onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it))
-                },
+                onValueChange = { onEvent(DocumentsUiEvent.CustomFieldChanged(field.id, it)) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("${field.name} (${field.type.name.lowercase()})") },
+                label = { Text(field.name) },
                 minLines = if (field.type.name == "LONG_TEXT") 3 else 1
             )
         }
 
         item {
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text("OCR / extracted text", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            Surface(tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selected.content.ifBlank { "No OCR text available." },
-                    modifier = Modifier.padding(12.dp)
-                )
+            SectionHeader("Extracted text")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { clipboard.setText(AnnotatedString(selected.content)) }) { Text("Copy") }
+                TextButton(onClick = {
+                    onEvent(DocumentsUiEvent.SearchChanged(selected.content.take(120)))
+                }) { Text("Search") }
+            }
+            Surface(
+                tonalElevation = 1.dp,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(selected.content.ifBlank { "No OCR text available." }, Modifier.padding(16.dp))
             }
         }
     }
-}
 
-@Composable
-private fun EmptyDocumentsState() {
-    Box(
-        Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("No documents", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Import a file or scan a document to get started.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete document?") },
+            text = { Text("This removes the document from the local library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onEvent(DocumentsUiEvent.Delete(selected.id))
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
     }
 }
 
 @Composable
-private fun EmptySelection() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Select a document", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Choose a document from the list to edit its metadata.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+private fun CatalogChips(
+    title: String,
+    selected: Long?,
+    items: List<Pair<Long, String>>,
+    onSelect: (Long?) -> Unit
+) {
+    SectionHeader(title)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(selected == null, { onSelect(null) }, label = { Text("None") })
+        items.take(24).forEach { (id, name) ->
+            FilterChip(selected == id, { onSelect(id) }, label = { Text(name) })
         }
     }
 }
-
-private fun formatEpochDate(epochMillis: Long): String =
-    kotlinx.datetime.Instant.fromEpochMilliseconds(epochMillis).toString().take(10)
