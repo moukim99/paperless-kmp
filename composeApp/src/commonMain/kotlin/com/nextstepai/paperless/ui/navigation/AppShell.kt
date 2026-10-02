@@ -56,6 +56,10 @@ fun AppShell(
     var destination by rememberSaveable { mutableStateOf(AppDestination.Documents) }
     val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
     val showingDocumentDetail = compact && state.selected != null && destination == AppDestination.Documents
+    val handleEvent: (DocumentsUiEvent) -> Unit = { event ->
+        if (event is DocumentsUiEvent.Select) destination = AppDestination.Documents
+        onEvent(event)
+    }
 
     if (compact) {
         Scaffold(
@@ -76,7 +80,7 @@ fun AppShell(
             },
         ) { padding ->
             Surface(Modifier.fillMaxSize().padding(padding)) {
-                AppDestinationContent(destination, state, onEvent)
+                AppDestinationContent(destination, state, handleEvent)
             }
         }
     } else {
@@ -103,7 +107,7 @@ fun AppShell(
                 AppDestinationContent(
                     destination = destination,
                     state = state,
-                    onEvent = onEvent,
+                    onEvent = handleEvent,
                     modifier = Modifier.weight(1f),
                 )
             }
