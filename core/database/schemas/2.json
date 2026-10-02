@@ -1,0 +1,9 @@
+{
+  "formatVersion": 1,
+  "database": "com.nextstepai.paperless.database.AppDatabase",
+  "version": 2,
+  "entities": [
+    {"tableName":"document_files"},
+    {"tableName":"sync_operations"}
+  ]
+}
