@@ -21,4 +21,12 @@ actual object PlatformDocumentPreviewer : DocumentPreviewer {
         }
         androidPreviewContext.startActivity(intent)
     }
+
+    override suspend fun readBytes(documentId: Long): ByteArray? = runCatching {
+        androidPreviewStore?.read(documentId)
+    }.getOrNull()
+
+    override suspend fun getLocalPath(documentId: Long): String? = runCatching {
+        androidPreviewStore?.localPath(documentId)
+    }.getOrNull()
 }

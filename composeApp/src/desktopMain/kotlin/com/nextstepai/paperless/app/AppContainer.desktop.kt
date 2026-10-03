@@ -28,13 +28,13 @@ actual object AppContainer {
     actual fun initialize(context: Any?) {
         if (initialized) return
         val db = buildDatabase(getDatabaseBuilder())
-        val repository = RoomDocumentRepository(db.documentDao())
+        val repository = RoomDocumentRepository(db.documentDao(), db.syncOperationDao())
         val enqueuer = EnqueueSyncOperationUseCase(db.syncOperationDao())
         val fileStore = DesktopDocumentFileStore(File(System.getProperty("user.home"), ".nextstepai-paperless/files"))
         desktopPreviewStore = fileStore
         val capture = ProcessDocumentCaptureUseCase(repository, DesktopOcrEngine(), fileStore, checksumGenerator = DesktopChecksumGenerator(), enqueuer = enqueuer)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        _viewModel = DocumentsViewModel(repository, RoomCatalogRepository(db.catalogDao()), capture, DeleteDocumentUseCase(repository, enqueuer), UpdateDocumentMetadataUseCase(repository, enqueuer), PlatformDocumentPreviewer, DesktopReminderScheduler(), scope)
+        _viewModel = DocumentsViewModel(repository, RoomCatalogRepository(db.catalogDao()), capture, DeleteDocumentUseCase(repository, enqueuer), UpdateDocumentMetadataUseCase(repository, enqueuer), PlatformDocumentPreviewer, DesktopReminderScheduler(), scope, syncEnqueuer = enqueuer, onTriggerSync = { startBackgroundSync() })
         val baseUrl = System.getenv("PAPERLESS_API_URL")?.takeIf { it.isNotBlank() }
         val token = System.getenv("PAPERLESS_API_TOKEN")?.takeIf { it.isNotBlank() }
         if (baseUrl != null && token != null) {

@@ -8,11 +8,16 @@ object AndroidSyncRuntime { @Volatile var processor: SyncQueueProcessor? = null 
 
 class AndroidSyncScheduler(private val context: Context) : SyncScheduler {
     override fun schedule() {
-        val request = PeriodicWorkRequestBuilder<PaperlessSyncWorker>(15, TimeUnit.MINUTES)
+        val periodicRequest = PeriodicWorkRequestBuilder<PaperlessSyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("paperless-sync", ExistingPeriodicWorkPolicy.UPDATE, request)
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork("paperless-sync", ExistingPeriodicWorkPolicy.UPDATE, periodicRequest)
+
+        val oneTimeRequest = OneTimeWorkRequestBuilder<PaperlessSyncWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork("paperless-sync-immediate", ExistingWorkPolicy.REPLACE, oneTimeRequest)
     }
 }
 

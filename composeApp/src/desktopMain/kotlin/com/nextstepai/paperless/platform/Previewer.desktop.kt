@@ -14,4 +14,12 @@ actual object PlatformDocumentPreviewer : DocumentPreviewer {
         val path = desktopPreviewStore?.localPath(documentId) ?: error("Local file not found")
         withContext(Dispatchers.IO) { Desktop.getDesktop().open(File(path)) }
     }
+
+    override suspend fun readBytes(documentId: Long): ByteArray? = runCatching {
+        desktopPreviewStore?.read(documentId)
+    }.getOrNull()
+
+    override suspend fun getLocalPath(documentId: Long): String? = runCatching {
+        desktopPreviewStore?.localPath(documentId)
+    }.getOrNull()
 }

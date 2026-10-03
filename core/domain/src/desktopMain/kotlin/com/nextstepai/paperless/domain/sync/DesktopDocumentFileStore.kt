@@ -18,4 +18,12 @@ class DesktopDocumentFileStore(private val root: File) : DocumentFileStore {
         val file = directory.listFiles()?.firstOrNull() ?: error("Local file for document $documentId not found")
         return file.readBytes()
     }
+
+    override suspend fun cacheSize(): Long = runCatching {
+        root.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    }.getOrDefault(0L)
+
+    override suspend fun clearCache() {
+        runCatching { root.listFiles()?.forEach { it.deleteRecursively() } }
+    }
 }

@@ -21,6 +21,11 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation("androidx.compose.material3.adaptive:adaptive:1.0.0")
+            implementation("androidx.compose.material3.adaptive:adaptive-layout:1.0.0")
+            implementation("androidx.compose.material3.adaptive:adaptive-navigation:1.0.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
             implementation(compose.ui)
             implementation(compose.components.resources)
         }

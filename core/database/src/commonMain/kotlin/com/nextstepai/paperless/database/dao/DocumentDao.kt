@@ -20,6 +20,8 @@ interface DocumentDao {
     suspend fun findById(id: Long): DocumentEntity?
     @RawQuery
     suspend fun searchFts(query: RoomRawQuery): List<DocumentEntity>
+    @Query("SELECT * FROM documents WHERE (rootDocumentId = :rootId OR id = :rootId) AND isDeleted = 0 ORDER BY COALESCE(versionIndex, 1) ASC, created ASC")
+    fun observeVersions(rootId: Long): Flow<List<DocumentEntity>>
     @Query("SELECT * FROM documents WHERE expiresAt IS NOT NULL AND expiresAt <= :beforeEpochMillis AND isDeleted = 0 ORDER BY expiresAt ASC")
     fun observeExpiring(beforeEpochMillis: Long): Flow<List<DocumentEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(entity: DocumentEntity): Long
@@ -27,8 +29,8 @@ interface DocumentDao {
     @Query("UPDATE documents SET remoteId = :remoteId, serverVersion = :serverVersion, syncedAt = :syncedAt, lastSyncedModified = :syncedModified, syncState = 'SYNCED' WHERE id = :id")
     suspend fun markSynced(id: Long, remoteId: String, serverVersion: Long, syncedAt: Long, syncedModified: Long)
     @Query("UPDATE documents SET syncState = :state WHERE id = :id") suspend fun markSyncState(id: Long, state: String)
-    @Query("UPDATE documents SET title = :title, expiresAt = :expiresAt, reminderDaysBeforeExpiry = :reminderDaysBeforeExpiry, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :id")
-    suspend fun updateMetadata(id: Long, title: String, expiresAt: Long?, reminderDaysBeforeExpiry: Int?, modified: Long)
+    @Query("UPDATE documents SET title = :title, content = :content, versionLabel = :versionLabel, created = :created, archiveSerialNumber = :archiveSerialNumber, expiresAt = :expiresAt, reminderDaysBeforeExpiry = :reminderDaysBeforeExpiry, modified = :modified, syncState = 'PENDING_UPDATE' WHERE id = :id")
+    suspend fun updateMetadata(id: Long, title: String, content: String, versionLabel: String?, created: Long, archiveSerialNumber: Long?, expiresAt: Long?, reminderDaysBeforeExpiry: Int?, modified: Long)
 }
 
 @Dao

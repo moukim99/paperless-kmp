@@ -16,7 +16,15 @@ class ProcessDocumentCaptureUseCase(
     private val checksumGenerator: ChecksumGenerator,
     private val enqueuer: SyncOperationEnqueuer? = null
 ) {
-    suspend operator fun invoke(input: DocumentInput): Result<Long> = runCatching {
+    suspend operator fun invoke(
+        input: DocumentInput,
+        rootDocumentId: Long? = null,
+        versionIndex: Int? = null,
+        versionLabel: String? = null,
+        correspondentId: Long? = null,
+        documentTypeId: Long? = null,
+        storagePathId: Long? = null,
+    ): Result<Long> = runCatching {
         val now = clock.now()
         val content = input.suppliedOcrText ?: ocrEngine.extractText(input.bytes, input.mimeType)
         val checksum = checksumGenerator.sha256(input.bytes)
@@ -27,8 +35,8 @@ class ProcessDocumentCaptureUseCase(
                 id = 0,
                 remoteId = null,
                 ownerId = null,
-                correspondentId = null,
-                storagePathId = null,
+                correspondentId = correspondentId,
+                storagePathId = storagePathId,
                 title = input.filename.substringBeforeLast('.', input.filename),
                 content = content,
                 mimeType = input.mimeType,
@@ -42,9 +50,10 @@ class ProcessDocumentCaptureUseCase(
                 archiveFilename = null,
                 originalFilename = input.filename,
                 archiveSerialNumber = null,
-                rootDocumentId = null,
-                versionIndex = null,
-                versionLabel = null,
+                rootDocumentId = rootDocumentId,
+                versionIndex = versionIndex,
+                versionLabel = versionLabel,
+                documentTypeId = documentTypeId,
                 expiresAt = null,
                 reminderDaysBeforeExpiry = null,
                 isDeleted = false
@@ -54,5 +63,4 @@ class ProcessDocumentCaptureUseCase(
         enqueuer?.enqueue(id, "UPLOAD")
         id
     }
-
 }
