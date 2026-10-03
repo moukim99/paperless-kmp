@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +47,11 @@ import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.ui.window.Dialog
+import com.nextstepai.paperless.platform.PlatformDocumentPreviewer
+import com.nextstepai.paperless.ui.components.CustomFieldInput
+import com.nextstepai.paperless.ui.components.DocumentPreviewPane
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -174,14 +180,34 @@ fun DocumentsScreen(
         },
         detailPane = {
             AnimatedPane {
-                selected?.let {
-                    DocumentDetails(
-                        state = state,
-                        selected = it,
-                        onEvent = onEvent,
-                        modifier = Modifier.fillMaxSize(),
-                        showTopBar = true,
-                    )
+                selected?.let { doc ->
+                    if (!compact) {
+                        Row(Modifier.fillMaxSize()) {
+                            DocumentDetails(
+                                state = state,
+                                selected = doc,
+                                onEvent = onEvent,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                showTopBar = true,
+                            )
+                            DocumentPreviewPane(
+                                documentId = doc.id,
+                                mimeType = doc.mimeType,
+                                title = doc.title,
+                                previewer = PlatformDocumentPreviewer,
+                                onOpenExternal = { onEvent(DocumentsUiEvent.OpenFile) },
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
+                        }
+                    } else {
+                        DocumentDetails(
+                            state = state,
+                            selected = doc,
+                            onEvent = onEvent,
+                            modifier = Modifier.fillMaxSize(),
+                            showTopBar = true,
+                        )
+                    }
                 } ?: EmptyState(
                     "Your document details",
                     "Select a document to view metadata, expiry, tags and extracted text."
@@ -528,6 +554,7 @@ private fun DocumentDetails(
     var confirmDelete by remember(selected.id) { mutableStateOf(false) }
     var ocrExpanded by rememberSaveable(selected.id) { mutableStateOf(false) }
     var editOcrMode by remember(selected.id) { mutableStateOf(false) }
+    var showInAppPreview by rememberSaveable(selected.id) { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val availableDocs = remember(state.documents) {
         state.documents.map { it.id to it.title.ifBlank { "Untitled document #${it.id}" } }
@@ -706,44 +733,100 @@ private fun DocumentDetails(
                 }
             }
 
-            if (state.documentVersions.size > 1) {
-                item {
-                    DetailCard(title = "Document versions (${state.documentVersions.size})", icon = Icons.Outlined.FolderOpen) {
-                        Column(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
-                            state.documentVersions.forEach { ver ->
-                                val isCurrent = ver.id == selected.id
-                                Surface(
-                                    onClick = { if (!isCurrent) onEvent(DocumentsUiEvent.SelectVersion(ver.id)) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = MaterialTheme.shapes.medium,
-                                    color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+            item {
+                var showUploadVersionMenu by remember { mutableStateOf(false) }
+                val targetRootId = selected.rootDocumentId ?: selected.id
+                DetailCard(title = "Document versions (${state.documentVersions.size.coerceAtLeast(1)})", icon = Icons.Outlined.FolderOpen) {
+                    Column(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                        state.documentVersions.forEach { ver ->
+                            val isCurrent = ver.id == selected.id
+                            Surface(
+                                onClick = { if (!isCurrent) onEvent(DocumentsUiEvent.SelectVersion(ver.id)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(PaperlessDimensions.md),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(PaperlessDimensions.md),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column {
-                                            Text(
-                                                "Version ${ver.versionIndex ?: 1}" + if (!ver.versionLabel.isNullOrBlank()) " - ${ver.versionLabel}" else "",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                "Created: ${ver.createdInput}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        if (isCurrent) {
-                                            AssistChip(
-                                                onClick = {},
-                                                enabled = false,
-                                                label = { Text("Current") }
-                                            )
-                                        }
+                                    Column {
+                                        Text(
+                                            "Version ${ver.versionIndex ?: 1}" + if (!ver.versionLabel.isNullOrBlank()) " - ${ver.versionLabel}" else "",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "Created: ${ver.createdInput}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (isCurrent) {
+                                        AssistChip(
+                                            onClick = {},
+                                            enabled = false,
+                                            label = { Text("Current") }
+                                        )
                                     }
                                 }
+                            }
+                        }
+
+                        Spacer(Modifier.height(PaperlessDimensions.xs))
+
+                        Box {
+                            OutlinedButton(
+                                onClick = { showUploadVersionMenu = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Outlined.UploadFile, null)
+                                Spacer(Modifier.width(PaperlessDimensions.sm))
+                                Text("Upload New Version")
+                            }
+
+                            DropdownMenu(
+                                expanded = showUploadVersionMenu,
+                                onDismissRequest = { showUploadVersionMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Outlined.DocumentScanner, null)
+                                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                                            Text("Scan new version")
+                                        }
+                                    },
+                                    onClick = {
+                                        showUploadVersionMenu = false
+                                    },
+                                    trailingIcon = {
+                                        DocumentScannerButton { input ->
+                                            showUploadVersionMenu = false
+                                            onEvent(DocumentsUiEvent.UploadNewVersion(targetRootId, input))
+                                        }
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Outlined.UploadFile, null)
+                                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                                            Text("Pick file for new version")
+                                        }
+                                    },
+                                    onClick = {
+                                        showUploadVersionMenu = false
+                                    },
+                                    trailingIcon = {
+                                        DocumentPickerButton { input ->
+                                            showUploadVersionMenu = false
+                                            onEvent(DocumentsUiEvent.UploadNewVersion(targetRootId, input))
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
@@ -913,7 +996,12 @@ private fun DocumentDetails(
                         horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilledTonalButton(onClick = { onEvent(DocumentsUiEvent.OpenFile) }) {
+                        FilledTonalButton(onClick = { showInAppPreview = true }) {
+                            Icon(Icons.Outlined.Visibility, null)
+                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                            Text("In-App Preview")
+                        }
+                        OutlinedButton(onClick = { onEvent(DocumentsUiEvent.OpenFile) }) {
                             Icon(Icons.Outlined.OpenInNew, null)
                             Spacer(Modifier.width(PaperlessDimensions.sm))
                             Text("Open file")
@@ -926,6 +1014,19 @@ private fun DocumentDetails(
                     }
                 }
             }
+        }
+    }
+
+    if (showInAppPreview) {
+        Dialog(onDismissRequest = { showInAppPreview = false }) {
+            DocumentPreviewPane(
+                documentId = selected.id,
+                mimeType = selected.mimeType,
+                title = selected.title,
+                previewer = PlatformDocumentPreviewer,
+                onOpenExternal = { onEvent(DocumentsUiEvent.OpenFile) },
+                onClose = { showInAppPreview = false }
+            )
         }
     }
 

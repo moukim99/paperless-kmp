@@ -2,6 +2,13 @@ package com.nextstepai.paperless.domain.sync
 
 enum class SyncState { SYNCED, PENDING_UPLOAD, PENDING_UPDATE, PENDING_DELETE, UPLOADING, FAILED, CONFLICT }
 
+data class SyncSettings(
+    val serverUrl: String = "https://example.invalid",
+    val authToken: String = "",
+    val syncIntervalMinutes: Int = 15,
+    val syncOnWifiOnly: Boolean = false
+)
+
 data class RemoteDocumentMetadata(
     val remoteId: String?, val title: String, val content: String, val mimeType: String,
     val checksum: String, val archiveChecksum: String?, val pageCount: Int?, val created: Long,

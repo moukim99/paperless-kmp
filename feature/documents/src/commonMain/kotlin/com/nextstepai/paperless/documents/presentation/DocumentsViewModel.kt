@@ -10,11 +10,13 @@ import com.nextstepai.paperless.domain.usecase.DeleteDocumentUseCase
 import com.nextstepai.paperless.domain.usecase.UpdateDocumentMetadataUseCase
 import com.nextstepai.paperless.domain.platform.DocumentPreviewer
 import com.nextstepai.paperless.domain.platform.ReminderScheduler
+import io.ktor.client.request.get
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.*
 
 enum class ExpiryState { None, Upcoming, Today, Expired }
+enum class ConnectionTestStatus { Idle, Testing, Success, Error }
 
 data class DocumentUiModel(
     val id: Long,
@@ -124,7 +126,15 @@ data class DocumentsUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val importing: Boolean = false,
-    val saving: Boolean = false
+    val saving: Boolean = false,
+    val serverUrl: String = "https://example.invalid",
+    val authToken: String = "",
+    val syncIntervalMinutes: Int = 15,
+    val syncOnWifiOnly: Boolean = false,
+    val connectionTestStatus: ConnectionTestStatus = ConnectionTestStatus.Idle,
+    val connectionTestMessage: String? = null,
+    val showClearCacheDialog: Boolean = false,
+    val cacheSizeFormatted: String = "0 KB"
 )
 
 sealed interface DocumentsUiEvent {
@@ -132,6 +142,7 @@ sealed interface DocumentsUiEvent {
     data object ClearSelection: DocumentsUiEvent
     data class Select(val id: Long): DocumentsUiEvent
     data class SelectVersion(val documentId: Long): DocumentsUiEvent
+    data class UploadNewVersion(val rootDocumentId: Long, val input: DocumentInput): DocumentsUiEvent
     data class Delete(val id: Long): DocumentsUiEvent
     data class Import(val input: DocumentInput): DocumentsUiEvent
     data class TitleChanged(val value: String): DocumentsUiEvent
@@ -166,6 +177,14 @@ sealed interface DocumentsUiEvent {
     data object SaveMetadata: DocumentsUiEvent
     data object OpenFile: DocumentsUiEvent
     data object Refresh: DocumentsUiEvent
+    data class ServerUrlChanged(val value: String): DocumentsUiEvent
+    data class AuthTokenChanged(val value: String): DocumentsUiEvent
+    data class SyncIntervalChanged(val minutes: Int): DocumentsUiEvent
+    data class SyncOnWifiOnlyToggled(val enabled: Boolean): DocumentsUiEvent
+    data object TestConnection: DocumentsUiEvent
+    data object SaveSyncSettings: DocumentsUiEvent
+    data class ToggleClearCacheDialog(val show: Boolean): DocumentsUiEvent
+    data object ClearLocalCache: DocumentsUiEvent
 }
 
 class DocumentsViewModel(
@@ -178,7 +197,8 @@ class DocumentsViewModel(
     private val reminders: ReminderScheduler,
     private val scope: CoroutineScope,
     private val syncEnqueuer: SyncOperationEnqueuer? = null,
-    private val onTriggerSync: (() -> Unit)? = null
+    private val onTriggerSync: (() -> Unit)? = null,
+    private val fileStore: com.nextstepai.paperless.domain.sync.DocumentFileStore? = null
 ) {
     private val _state = MutableStateFlow(DocumentsUiState())
     private var searchJob: Job? = null
@@ -191,6 +211,7 @@ class DocumentsViewModel(
         scope.launch { catalog.observeStoragePaths().collect { v -> _state.update { it.copy(storagePaths = v) } } }
         scope.launch { catalog.observeTags().collect { v -> _state.update { it.copy(tags = v) } } }
         scope.launch { catalog.observeCustomFields().collect { v -> _state.update { it.copy(customFields = v) } } }
+        refreshCacheSize()
     }
 
     fun onEvent(event: DocumentsUiEvent) {
@@ -216,6 +237,7 @@ class DocumentsViewModel(
             }
             is DocumentsUiEvent.Select -> select(event.id)
             is DocumentsUiEvent.SelectVersion -> select(event.documentId)
+            is DocumentsUiEvent.UploadNewVersion -> uploadNewVersion(event.rootDocumentId, event.input)
             DocumentsUiEvent.ClearSelection -> _state.update { it.copy(selectedId = null, selected = null) }
             is DocumentsUiEvent.Delete -> scope.launch { runCatching { delete(event.id); if (_state.value.selectedId == event.id) _state.update { it.copy(selectedId = null, selected = null) } }.onFailure { e -> _state.update { it.copy(error = e.message) } } }
             is DocumentsUiEvent.Import -> scope.launch { _state.update { it.copy(importing = true, error = null) }; runCatching { capture(event.input) }.onFailure { e -> _state.update { it.copy(error = e.message) } }; _state.update { it.copy(importing = false) } }
@@ -297,6 +319,14 @@ class DocumentsViewModel(
             DocumentsUiEvent.SaveMetadata -> saveMetadata()
             DocumentsUiEvent.OpenFile -> scope.launch { _state.value.selectedId?.let { id -> previewer.open(id).onFailure { e -> _state.update { it.copy(error = e.message) } } } }
             DocumentsUiEvent.Refresh -> Unit
+            is DocumentsUiEvent.ServerUrlChanged -> _state.update { it.copy(serverUrl = event.value) }
+            is DocumentsUiEvent.AuthTokenChanged -> _state.update { it.copy(authToken = event.value) }
+            is DocumentsUiEvent.SyncIntervalChanged -> _state.update { it.copy(syncIntervalMinutes = event.minutes) }
+            is DocumentsUiEvent.SyncOnWifiOnlyToggled -> _state.update { it.copy(syncOnWifiOnly = event.enabled) }
+            DocumentsUiEvent.TestConnection -> testConnection()
+            DocumentsUiEvent.SaveSyncSettings -> saveSyncSettings()
+            is DocumentsUiEvent.ToggleClearCacheDialog -> _state.update { it.copy(showClearCacheDialog = event.show) }
+            DocumentsUiEvent.ClearLocalCache -> clearCache()
         }
     }
 
@@ -373,5 +403,104 @@ class DocumentsViewModel(
             }
         }.onFailure { e -> _state.update { it.copy(error = e.message) } }
         _state.update { it.copy(saving = false) }
+    }
+
+    private fun uploadNewVersion(rootDocumentId: Long, input: DocumentInput) = scope.launch {
+        _state.update { it.copy(importing = true, error = null) }
+        runCatching {
+            val selectedDoc = _state.value.selected
+            val targetRootId = if (selectedDoc?.rootDocumentId != null && selectedDoc.rootDocumentId != 0L) {
+                selectedDoc.rootDocumentId
+            } else {
+                rootDocumentId
+            }
+
+            val currentVersions = repository.observeVersions(targetRootId).firstOrNull().orEmpty()
+            val maxVersion = currentVersions.maxOfOrNull { it.versionIndex ?: 1 } ?: selectedDoc?.versionIndex ?: 1
+            val nextVersionIndex = maxVersion + 1
+            val versionLabel = "v$nextVersionIndex"
+
+            val resultId = capture(
+                input = input,
+                rootDocumentId = targetRootId,
+                versionIndex = nextVersionIndex,
+                versionLabel = versionLabel,
+                correspondentId = selectedDoc?.correspondentId,
+                documentTypeId = selectedDoc?.documentTypeId,
+                storagePathId = selectedDoc?.storagePathId
+            ).getOrThrow()
+
+            if (selectedDoc != null && selectedDoc.tagIds.isNotEmpty()) {
+                catalog.setDocumentTags(resultId, selectedDoc.tagIds.toList())
+            }
+
+            select(resultId)
+        }.onFailure { e ->
+            _state.update { it.copy(error = e.message) }
+        }
+        _state.update { it.copy(importing = false) }
+    }
+
+    fun refreshCacheSize() = scope.launch {
+        fileStore?.cacheSize()?.let { bytes ->
+            val formatted = when {
+                bytes < 1024 -> "$bytes B"
+                bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+                else -> "${bytes / (1024 * 1024)} MB"
+            }
+            _state.update { it.copy(cacheSizeFormatted = formatted) }
+        }
+    }
+
+    private fun testConnection() = scope.launch {
+        _state.update { it.copy(connectionTestStatus = ConnectionTestStatus.Testing, connectionTestMessage = null) }
+        val url = _state.value.serverUrl.trim()
+        if (url.isBlank() || url.contains("example.invalid")) {
+            _state.update {
+                it.copy(
+                    connectionTestStatus = ConnectionTestStatus.Error,
+                    connectionTestMessage = "Please configure a valid Cloudflare Worker URL."
+                )
+            }
+            return@launch
+        }
+        runCatching {
+            val client = io.ktor.client.HttpClient()
+            val response = client.get(if (url.endsWith("/")) "${url}api/documents" else "$url/api/documents")
+            client.close()
+            if (response.status.value in 200..299) {
+                _state.update {
+                    it.copy(
+                        connectionTestStatus = ConnectionTestStatus.Success,
+                        connectionTestMessage = "Connection successful! Server responded HTTP ${response.status.value}"
+                    )
+                }
+            } else {
+                _state.update {
+                    it.copy(
+                        connectionTestStatus = ConnectionTestStatus.Error,
+                        connectionTestMessage = "Server returned status HTTP ${response.status.value}"
+                    )
+                }
+            }
+        }.onFailure { e ->
+            _state.update {
+                it.copy(
+                    connectionTestStatus = ConnectionTestStatus.Error,
+                    connectionTestMessage = e.message ?: "Connection failed."
+                )
+            }
+        }
+    }
+
+    private fun saveSyncSettings() = scope.launch {
+        _state.update { it.copy(connectionTestMessage = "Sync settings saved.") }
+        onTriggerSync?.invoke()
+    }
+
+    private fun clearCache() = scope.launch {
+        fileStore?.clearCache()
+        refreshCacheSize()
+        _state.update { it.copy(showClearCacheDialog = false) }
     }
 }

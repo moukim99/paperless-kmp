@@ -18,18 +18,31 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Wifi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,16 +51,21 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import com.nextstepai.paperless.documents.presentation.*
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,10 +76,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowWidthSizeClass
-import com.nextstepai.paperless.documents.presentation.DocumentUiModel
-import com.nextstepai.paperless.documents.presentation.DocumentsUiEvent
-import com.nextstepai.paperless.documents.presentation.DocumentsUiState
-import com.nextstepai.paperless.documents.presentation.ExpiryState
 import com.nextstepai.paperless.domain.model.Correspondent
 import com.nextstepai.paperless.domain.model.DocumentType
 import com.nextstepai.paperless.domain.model.StoragePath
@@ -182,7 +196,7 @@ private fun AppDestinationContent(
             modifier = modifier,
         )
         AppDestination.Tags -> CatalogManagementScreen(state, onEvent, modifier)
-        AppDestination.Settings -> SettingsScreen(modifier)
+        AppDestination.Settings -> SettingsScreen(state, onEvent, modifier)
     }
 }
 
@@ -632,7 +646,13 @@ private fun StoragePathsList(
 }
 
 @Composable
-private fun SettingsScreen(modifier: Modifier = Modifier) {
+private fun SettingsScreen(
+    state: DocumentsUiState,
+    onEvent: (DocumentsUiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = { TopAppBar(title = { Text("Settings") }) }
@@ -642,52 +662,199 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
             contentPadding = PaddingValues(PaperlessDimensions.lg),
             verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.md)
         ) {
-            item {
-                Text("App preferences", style = MaterialTheme.typography.titleLarge)
-            }
+            // 1. Cloudflare Sync Server
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(Modifier.padding(PaperlessDimensions.lg)) {
-                        Text("Appearance", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(PaperlessDimensions.sm))
-                        Text("System theme and dynamic Material 3 colors are currently enabled.")
+                    Column(
+                        Modifier.padding(PaperlessDimensions.lg),
+                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.CloudSync, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                            Text("Cloudflare Worker Sync Server", style = MaterialTheme.typography.titleLarge)
+                        }
                         Text(
-                            "Theme controls can be persisted here when preference storage is added.",
+                            "Configure your R2 & D1 Cloudflare Worker backend for cross-device sync.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        Spacer(Modifier.height(PaperlessDimensions.xs))
+
+                        OutlinedTextField(
+                            value = state.serverUrl,
+                            onValueChange = { onEvent(DocumentsUiEvent.ServerUrlChanged(it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Server URL") },
+                            placeholder = { Text("https://your-worker.workers.dev") },
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = state.authToken,
+                            onValueChange = { onEvent(DocumentsUiEvent.AuthTokenChanged(it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("API Auth Token") },
+                            singleLine = true,
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        contentDescription = "Toggle token visibility"
+                                    )
+                                }
+                            }
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalButton(
+                                onClick = { onEvent(DocumentsUiEvent.TestConnection) },
+                                enabled = state.connectionTestStatus != ConnectionTestStatus.Testing
+                            ) {
+                                if (state.connectionTestStatus == ConnectionTestStatus.Testing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(PaperlessDimensions.xs))
+                                    Text("Testing…")
+                                } else {
+                                    Text("Test Connection")
+                                }
+                            }
+
+                            Button(
+                                onClick = { onEvent(DocumentsUiEvent.SaveSyncSettings) }
+                            ) {
+                                Text("Save Settings")
+                            }
+                        }
+
+                        state.connectionTestMessage?.let { testMsg ->
+                            val isError = state.connectionTestStatus == ConnectionTestStatus.Error
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                                )
+                            ) {
+                                Text(
+                                    text = testMsg,
+                                    modifier = Modifier.padding(PaperlessDimensions.md),
+                                    color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                 }
             }
+
+            // 2. Auto-Sync Preferences
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(Modifier.padding(PaperlessDimensions.lg)) {
-                        Text("Sync", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(PaperlessDimensions.sm))
-                        Text("Background synchronization is managed by the app scheduler.")
-                        Text(
-                            "Server and account controls belong here in the next settings slice.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(
+                        Modifier.padding(PaperlessDimensions.lg),
+                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Wifi, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                            Text("Auto-Sync Behavior", style = MaterialTheme.typography.titleLarge)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Sync on Wi-Fi only", style = MaterialTheme.typography.bodyLarge)
+                                Text("Conserve mobile data during background sync", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = state.syncOnWifiOnly,
+                                onCheckedChange = { onEvent(DocumentsUiEvent.SyncOnWifiOnlyToggled(it)) }
+                            )
+                        }
+
+                        Text("Sync Interval", style = MaterialTheme.typography.labelMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                            listOf(15 to "15m", 30 to "30m", 60 to "1h", 0 to "Manual").forEach { (interval, label) ->
+                                FilterChip(
+                                    selected = state.syncIntervalMinutes == interval,
+                                    onClick = { onEvent(DocumentsUiEvent.SyncIntervalChanged(interval)) },
+                                    label = { Text(label) }
+                                )
+                            }
+                        }
                     }
                 }
             }
+
+            // 3. Storage & Local Cache
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(Modifier.padding(PaperlessDimensions.lg)) {
-                        Text("Notifications", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(PaperlessDimensions.sm))
-                        Text("Expiry reminders are supported.")
-                        Text(
-                            "Notification permission and reminder scheduling are handled by the Android layer.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(
+                        Modifier.padding(PaperlessDimensions.lg),
+                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Storage, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                            Text("Storage & Cache", style = MaterialTheme.typography.titleLarge)
+                        }
+
+                        Text("Local document cache size: ${state.cacheSizeFormatted}", style = MaterialTheme.typography.bodyMedium)
+
+                        OutlinedButton(
+                            onClick = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(true)) }
+                        ) {
+                            Text("Clear File Cache")
+                        }
+                    }
+                }
+            }
+
+            // 4. About App
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Column(
+                        Modifier.padding(PaperlessDimensions.lg),
+                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(PaperlessDimensions.sm))
+                            Text("Paperless KMP", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Text("Version v0.1.0", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
+                            AssistChip(onClick = {}, enabled = false, label = { Text("Room DB v5") })
+                            AssistChip(onClick = {}, enabled = false, label = { Text("Compose Multiplatform") })
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (state.showClearCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(false)) },
+            title = { Text("Clear file cache?") },
+            text = { Text("This will remove locally cached document files. They can be re-downloaded or re-synced from your server.") },
+            confirmButton = {
+                TextButton(onClick = { onEvent(DocumentsUiEvent.ClearLocalCache) }) {
+                    Text("Clear Cache", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(false)) }) { Text("Cancel") }
+            }
+        )
     }
 }
 
