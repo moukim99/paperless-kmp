@@ -22,6 +22,12 @@ import kotlinx.coroutines.launch
 
 @Composable
 actual fun DocumentScannerButton(onScanned: (DocumentInput) -> Unit) {
+    val launch = rememberDocumentScannerLauncher(onScanned)
+    Button(onClick = launch) { Text("Scan document") }
+}
+
+@Composable
+actual fun rememberDocumentScannerLauncher(onScanned: (DocumentInput) -> Unit): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val options = GmsDocumentScannerOptions.Builder()
@@ -39,10 +45,13 @@ actual fun DocumentScannerButton(onScanned: (DocumentInput) -> Unit) {
             if (input != null) onScanned(input)
         }
     }
-    Button(onClick = {
-        scanner.getStartScanIntent(context as android.app.Activity)
-            .addOnSuccessListener { sender -> launcher.launch(IntentSenderRequest.Builder(sender).build()) }
-    }) { Text("Scan document") }
+    return {
+        val activity = context as? android.app.Activity
+        if (activity != null) {
+            scanner.getStartScanIntent(activity)
+                .addOnSuccessListener { sender -> launcher.launch(IntentSenderRequest.Builder(sender).build()) }
+        }
+    }
 }
 
 private suspend fun GmsDocumentScanningResult.toDocumentInput(context: Context): DocumentInput? {

@@ -1,0 +1,212 @@
+<resources>
+    <string name="app_name">Paperless Mobile</string>
+
+    <!-- Navigation & Destinations -->
+    <string name="nav_documents">Documents</string>
+    <string name="nav_inbox">Boîte de réception</string>
+    <string name="nav_expiring">Expirations</string>
+    <string name="nav_catalog">Catalogue</string>
+    <string name="nav_settings">Paramètres</string>
+
+    <!-- Documents Screen -->
+    <string name="documents_title">Documents</string>
+    <string name="documents_library_count">%d dans votre bibliothèque</string>
+    <string name="documents_sync_pending">%d synchro en attente</string>
+    <string name="documents_search_placeholder">Rechercher vos documents...</string>
+    <string name="documents_search_supports">Prend en charge: tag:, type:, correspondent:, after:, expiry:</string>
+    <string name="documents_empty_title">Aucun document trouvé</string>
+    <string name="documents_empty_subtitle">Essayez d\'ajuster votre recherche ou vos filtres.</string>
+    <string name="importing_indexing">Importation &amp; Indexation du document...</string>
+    <string name="importing_desc">Extraction de texte OCR et enregistrement en base de données.</string>
+
+    <string name="add_document">Ajouter un document</string>
+    <string name="add_to_library">Ajouter à la bibliothèque</string>
+    <string name="add_to_library_desc">Choisissez comment ajouter un document à votre archive Paperless.</string>
+    <string name="import_file">Importer un fichier</string>
+    <string name="import_file_desc">Choisissez un fichier PDF, JPG ou PNG existant depuis votre appareil ou le cloud.</string>
+    <string name="scan_document">Numériser un document</string>
+    <string name="scan_document_desc">Capturez une ou plusieurs pages avec détection automatique des bords et correction de la perspective.</string>
+    <string name="encrypted_storage">Stockage chiffré AES-256</string>
+    <string name="help_guide">Aide &amp; Guide</string>
+    <string name="pending_upload">En attente d\'envoi</string>
+
+    <!-- Inbox Screen -->
+    <string name="inbox_title">Boîte de réception</string>
+    <string name="inbox_subtitle">Documents capturés récents (%d éléments)</string>
+    <string name="inbox_empty_title">Boîte de réception vide</string>
+    <string name="inbox_empty_subtitle">Tout est clair ! Les nouveaux documents apparaîtront ici.</string>
+    <string name="select_all">Tout sélectionner</string>
+    <string name="mark_reviewed">Marquer comme révisé</string>
+    <string name="process_queue">Traiter la file</string>
+    <string name="auto_ingestion_active">Ingestion automatique active</string>
+    <string name="status_needs_review">À réviser</string>
+    <string name="status_ocr_progress">OCR en cours</string>
+    <string name="status_unassigned">Non assigné</string>
+    <string name="assign_metadata">Assigner des métadonnées</string>
+
+    <!-- Expiring Screen -->
+    <string name="expiring_title">Documents expirant bientôt</string>
+    <string name="expiring_subtitle">Documents nécessitant une attention &amp; renouvellement</string>
+    <string name="expiring_empty_title">Aucun document à expirer</string>
+    <string name="expiring_empty_subtitle">Aucun document n\'expire prochainement.</string>
+    <string name="immediate_priority">PRIORITÉ IMMÉDIATE</string>
+    <string name="extend_date">Prolonger la date</string>
+    <string name="renewed">Renouvelé</string>
+    <string name="view">Voir</string>
+    <string name="expires_in_days">Expire dans %d jours</string>
+    <string name="status_expired">Expiré</string>
+    <string name="status_expires_today">Expire aujourd\'hui</string>
+
+    <!-- Catalog Screen -->
+    <string name="catalog_title">Gestion du catalogue</string>
+    <string name="catalog_subtitle">Organiser la taxonomie, les correspondants et le stockage</string>
+    <string name="catalog_tags">Étiquettes</string>
+    <string name="catalog_correspondents">Correspondants</string>
+    <string name="catalog_document_types">Types de documents</string>
+    <string name="catalog_storage_paths">Chemins de stockage</string>
+    <string name="search_tags">Rechercher des étiquettes...</string>
+    <string name="active_tags">ÉTIQUETTES ACTIVES</string>
+    <string name="smart_autotagging">Étiquetage auto intelligent activé</string>
+
+    <string name="add_tag">Ajouter une étiquette</string>
+    <string name="edit_tag">Modifier l\'étiquette</string>
+    <string name="tag_name">Nom de l\'étiquette</string>
+    <string name="color">Couleur</string>
+    <string name="hex_color_code">Code couleur Hex</string>
+    <string name="inbox_tag">Étiquette Inbox</string>
+    <string name="inbox_tag_desc">Les nouveaux documents reçoivent cette étiquette automatiquement</string>
+    <string name="parent_tag">Étiquette parente</string>
+    <string name="auto_matching_rules">Règles de correspondance auto</string>
+    <string name="matching_pattern">Motif de correspondance</string>
+    <string name="matching_algorithm">Algorithme de correspondance</string>
+    <string name="ignore_case">Ignorer la casse</string>
+
+    <string name="add_correspondent">Ajouter un correspondant</string>
+    <string name="edit_correspondent">Modifier le correspondant</string>
+    <string name="correspondent_desc">Définissez un expéditeur ou destinataire pour étiqueter automatiquement les documents entrants.</string>
+
+    <string name="add_document_type">Ajouter un type de document</string>
+    <string name="edit_document_type">Modifier le type de document</string>
+
+    <string name="add_storage_path">Ajouter un chemin de stockage</string>
+    <string name="edit_storage_path">Modifier le chemin de stockage</string>
+    <string name="path_template">Modèle de chemin</string>
+
+    <string name="delete_confirm">Supprimer %s ?</string>
+    <string name="delete_warning">Cela supprimera \'%s\' de votre catalogue.</string>
+
+    <!-- Document Details -->
+    <string name="document_details_title">Détails du document</string>
+    <string name="section_info">Informations du document</string>
+    <string name="section_versions">Versions du document</string>
+    <string name="section_dates_reminders">Dates et rappels</string>
+    <string name="section_tags">Étiquettes et catégories</string>
+    <string name="section_ocr">Texte extrait (OCR)</string>
+    <string name="section_actions">Actions</string>
+
+    <string name="label_document_title">Titre du document</string>
+    <string name="label_correspondent">Correspondant</string>
+    <string name="label_document_type">Type de document</string>
+    <string name="label_storage_path">Chemin de stockage</string>
+    <string name="label_asn">N° d\'archive (ASN)</string>
+    <string name="label_version_label">Libellé de version</string>
+    <string name="placeholder_asn">ex. ASN-04981</string>
+    <string name="placeholder_version">ex. Scan original</string>
+
+    <string name="none_unassigned">Aucun (non assigné)</string>
+    <string name="none">Aucun</string>
+    <string name="none_root_inbox">Aucun (Racine / Inbox)</string>
+
+    <string name="label_version_number">Version %d</string>
+    <string name="badge_current">ACTUEL</string>
+    <string name="version_created">Créé : %s</string>
+    <string name="upload_new_version">Importer une nouvelle version</string>
+
+    <string name="label_document_date">Date du document</string>
+    <string name="label_expiry_date">Date d\'expiration</string>
+    <string name="label_reminder_days">Jours de rappel</string>
+
+    <string name="ocr_preview_snippet">Aperçu de l\'OCR :</string>
+    <string name="in_app_preview">Aperçu dans l\'application</string>
+    <string name="open_external">Ouvrir à l\'extérieur</string>
+    <string name="action_copy">Copier</string>
+    <string name="search">Rechercher</string>
+    <string name="indexed">INDEXÉ</string>
+
+    <string name="field_title">Titre</string>
+    <string name="field_correspondent">Correspondant</string>
+    <string name="field_document_type">Type de document</string>
+    <string name="field_storage_path">Chemin de stockage</string>
+    <string name="field_created_date">Date de création</string>
+    <string name="field_added_date">Date d\'ajout</string>
+    <string name="field_tags">Étiquettes</string>
+    <string name="field_asn">Numéro d\'archive (ASN)</string>
+    <string name="field_content">Contenu</string>
+    <string name="field_notes">Notes</string>
+    <string name="field_custom_fields">Champs personnalisés</string>
+
+    <string name="action_save">Enregistrer les modifications</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_delete">Supprimer le document</string>
+    <string name="action_edit">Modifier</string>
+    <string name="action_add_note">Ajouter une note</string>
+    <string name="action_retry">Réessayer</string>
+
+    <string name="dialog_delete_confirm_title">Supprimer le document</string>
+    <string name="dialog_delete_confirm_message">Êtes-vous sûr de vouloir supprimer ce document ? Cette action est irréversible.</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_subtitle">Préférences, synchronisation Cloudflare &amp; stockage d\'archivage.</string>
+    <string name="settings_server_title">Serveur de synchronisation Cloudflare Worker</string>
+    <string name="settings_server_desc">Configurez votre serveur Cloudflare pour une synchronisation fluide entre vos appareils.</string>
+    <string name="settings_server_url">URL du serveur</string>
+    <string name="settings_api_token">Jeton d\'authentification API</string>
+    <string name="settings_test_connection">Tester la connexion</string>
+    <string name="connecting">Connexion...</string>
+    <string name="settings_connection_success">Connexion réussie !</string>
+    <string name="settings_connection_failed">Échec de la connexion</string>
+    <string name="settings_save">Enregistrer les paramètres</string>
+    <string name="settings_saved">Enregistré</string>
+
+    <string name="storage_and_cache">Stockage et cache</string>
+    <string name="local_document_cache">Cache local des documents</string>
+    <string name="clear_cache">Effacer le cache</string>
+    <string name="confirm_clear">Confirmer l\'effacement</string>
+
+    <string name="ocr_indexing">OCR &amp; Indexation IA</string>
+    <string name="ocr_indexing_desc">Reconnaissance optique de caractères sur l\'appareil pour la recherche dans vos scans.</string>
+    <string name="installed_lexicons">Packs de lexiques installés</string>
+    <string name="offline_ocr">Moteur OCR hors ligne</string>
+    <string name="offline_ocr_desc">Traiter les documents uniquement sur l\'appareil pour garantir la confidentialité</string>
+
+    <string name="editorial_build">Moteur DocVault • Version 2026.10</string>
+    <string name="crafted_for_scholars">Conçu pour les chercheurs et archivistes.</string>
+
+    <string name="settings_auto_sync">Comportement de synchronisation automatique</string>
+    <string name="settings_sync_wifi">Synchroniser uniquement via Wi-Fi</string>
+    <string name="sync_wifi_desc">Économiser les données mobiles pendant la synchronisation en arrière-plan</string>
+    <string name="settings_sync_interval">Intervalle de synchronisation</string>
+
+    <string name="settings_language_title">Langue de l\'application</string>
+    <string name="settings_language_subtitle">Choisissez votre langue préférée (anglais, arabe, français)</string>
+    <string name="language_system">Par défaut du système</string>
+    <string name="language_english">English (Anglais)</string>
+    <string name="language_arabic">العربية (Arabe)</string>
+    <string name="language_french">Français</string>
+
+    <string name="settings_theme_title">Apparence</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
+
+    <string name="settings_about_title">À propos</string>
+    <string name="settings_version">Version %s</string>
+
+    <!-- Sync & General -->
+    <string name="sync_status_idle">À jour</string>
+    <string name="sync_status_syncing">Synchronisation...</string>
+    <string name="sync_status_error">Erreur de synchronisation</string>
+    <string name="loading">Chargement...</string>
+    <string name="error_generic">Une erreur est survenue. Veuillez réessayer.</string>
+</resources>

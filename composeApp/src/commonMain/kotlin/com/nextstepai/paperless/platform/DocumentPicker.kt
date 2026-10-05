@@ -5,3 +5,6 @@ import com.nextstepai.paperless.domain.capture.DocumentInput
 
 @Composable
 expect fun DocumentPickerButton(onPicked: (DocumentInput) -> Unit)
+
+@Composable
+expect fun rememberDocumentPickerLauncher(onPicked: (DocumentInput) -> Unit): () -> Unit

@@ -52,6 +52,8 @@ import com.nextstepai.paperless.domain.model.DocumentType
 import com.nextstepai.paperless.domain.model.StoragePath
 import com.nextstepai.paperless.domain.model.Tag
 import com.nextstepai.paperless.ui.theme.PaperlessDimensions
+import org.jetbrains.compose.resources.stringResource
+import paperless_kmp.composeapp.generated.resources.*
 
 private val presetColors = listOf(
     "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
@@ -90,7 +92,7 @@ fun TagEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (tag == null) "Add Tag" else "Edit Tag") },
+        title = { Text(if (tag == null) stringResource(Res.string.add_tag) else stringResource(Res.string.edit_tag)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -99,13 +101,13 @@ fun TagEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Tag name") },
+                    label = { Text(stringResource(Res.string.tag_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
-                    Text("Color", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(Res.string.color), style = MaterialTheme.typography.labelMedium)
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs),
                         verticalAlignment = Alignment.CenterVertically
@@ -129,7 +131,7 @@ fun TagEditDialog(
                     OutlinedTextField(
                         value = color,
                         onValueChange = { color = it },
-                        label = { Text("Hex color code") },
+                        label = { Text(stringResource(Res.string.hex_color_code)) },
                         leadingIcon = { Icon(Icons.Outlined.ColorLens, null) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -142,20 +144,20 @@ fun TagEditDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Inbox tag", style = MaterialTheme.typography.bodyMedium)
-                        Text("New documents are assigned this tag automatically", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(Res.string.inbox_tag), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.inbox_tag_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = isInbox, onCheckedChange = { isInbox = it })
                 }
 
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    val parentName = availableTags.firstOrNull { it.id == parentId }?.name ?: "None"
+                    val parentName = availableTags.firstOrNull { it.id == parentId }?.name ?: stringResource(Res.string.none)
                     OutlinedButton(
                         onClick = { parentDropdownExpanded = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                            Text("Parent tag", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(Res.string.parent_tag), style = MaterialTheme.typography.labelMedium)
                             Text(parentName)
                         }
                     }
@@ -164,7 +166,7 @@ fun TagEditDialog(
                         onDismissRequest = { parentDropdownExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("None") },
+                            text = { Text(stringResource(Res.string.none)) },
                             onClick = {
                                 parentId = null
                                 parentDropdownExpanded = false
@@ -189,7 +191,7 @@ fun TagEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Auto-matching rules", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(Res.string.auto_matching_rules), style = MaterialTheme.typography.titleMedium)
                     IconButton(onClick = { showAutoMatching = !showAutoMatching }) {
                         Icon(
                             if (showAutoMatching) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
@@ -202,7 +204,7 @@ fun TagEditDialog(
                     OutlinedTextField(
                         value = match,
                         onValueChange = { match = it },
-                        label = { Text("Matching pattern") },
+                        label = { Text(stringResource(Res.string.matching_pattern)) },
                         placeholder = { Text("e.g. Invoice|Bill") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -214,7 +216,7 @@ fun TagEditDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                                Text("Matching algorithm", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(Res.string.matching_algorithm), style = MaterialTheme.typography.labelMedium)
                                 Text(matchingAlgorithms[algorithm] ?: "Any word")
                             }
                         }
@@ -239,7 +241,7 @@ fun TagEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Ignore case (insensitive)", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.ignore_case), style = MaterialTheme.typography.bodyMedium)
                         Switch(checked = insensitive, onCheckedChange = { insensitive = it })
                     }
                 }
@@ -266,11 +268,11 @@ fun TagEditDialog(
                 },
                 enabled = name.isNotBlank()
             ) {
-                Text("Save")
+                Text(stringResource(Res.string.action_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_cancel)) }
         }
     )
 }
@@ -305,7 +307,7 @@ fun ClassificationEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("$title name") },
+                    label = { Text(stringResource(Res.string.field_title)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -317,7 +319,7 @@ fun ClassificationEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Auto-matching rules", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(Res.string.auto_matching_rules), style = MaterialTheme.typography.titleMedium)
                     IconButton(onClick = { showAutoMatching = !showAutoMatching }) {
                         Icon(
                             if (showAutoMatching) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
@@ -330,7 +332,7 @@ fun ClassificationEditDialog(
                     OutlinedTextField(
                         value = match,
                         onValueChange = { match = it },
-                        label = { Text("Matching pattern") },
+                        label = { Text(stringResource(Res.string.matching_pattern)) },
                         placeholder = { Text("e.g. Telecom|Vodafone") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -342,7 +344,7 @@ fun ClassificationEditDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                                Text("Matching algorithm", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(Res.string.matching_algorithm), style = MaterialTheme.typography.labelMedium)
                                 Text(matchingAlgorithms[algorithm] ?: "Any word")
                             }
                         }
@@ -367,7 +369,7 @@ fun ClassificationEditDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Ignore case (insensitive)", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(Res.string.ignore_case), style = MaterialTheme.typography.bodyMedium)
                         Switch(checked = insensitive, onCheckedChange = { insensitive = it })
                     }
                 }
@@ -382,11 +384,11 @@ fun ClassificationEditDialog(
                 },
                 enabled = name.isNotBlank()
             ) {
-                Text("Save")
+                Text(stringResource(Res.string.action_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_cancel)) }
         }
     )
 }

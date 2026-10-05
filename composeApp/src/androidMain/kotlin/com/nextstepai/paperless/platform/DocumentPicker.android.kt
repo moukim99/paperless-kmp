@@ -15,6 +15,14 @@ import com.nextstepai.paperless.domain.capture.DocumentInput
 
 @Composable
 actual fun DocumentPickerButton(onPicked: (DocumentInput) -> Unit) {
+    val launch = rememberDocumentPickerLauncher(onPicked)
+    Button(onClick = launch) {
+        Text("Add document")
+    }
+}
+
+@Composable
+actual fun rememberDocumentPickerLauncher(onPicked: (DocumentInput) -> Unit): () -> Unit {
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -26,7 +34,5 @@ actual fun DocumentPickerButton(onPicked: (DocumentInput) -> Unit) {
         } ?: "document"
         onPicked(DocumentInput(name, mime, bytes))
     }
-    Button(onClick = { launcher.launch(arrayOf("application/pdf", "image/*", "text/plain", "application/octet-stream")) }) {
-        Text("Add document")
-    }
+    return { launcher.launch(arrayOf("application/pdf", "image/*", "text/plain", "application/octet-stream")) }
 }

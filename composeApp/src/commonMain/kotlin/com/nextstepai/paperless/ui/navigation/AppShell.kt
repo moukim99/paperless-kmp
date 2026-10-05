@@ -66,6 +66,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import com.nextstepai.paperless.documents.presentation.*
+import com.nextstepai.paperless.ui.inbox.*
+import com.nextstepai.paperless.ui.expiring.*
+import com.nextstepai.paperless.ui.catalog.*
+import com.nextstepai.paperless.ui.settings.*
+import com.nextstepai.paperless.ui.documentdetail.*
+import com.nextstepai.paperless.ui.theme.*
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -86,6 +92,22 @@ import com.nextstepai.paperless.ui.components.ClassificationEditDialog
 import com.nextstepai.paperless.ui.components.StoragePathEditDialog
 import com.nextstepai.paperless.ui.components.TagEditDialog
 import com.nextstepai.paperless.ui.theme.PaperlessDimensions
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+import org.jetbrains.compose.resources.stringResource
+import paperless_kmp.composeapp.generated.resources.*
+
+@Composable
+fun AppDestination.localizedLabel(): String {
+    return when (this) {
+        AppDestination.Documents -> stringResource(Res.string.nav_documents)
+        AppDestination.Inbox -> stringResource(Res.string.nav_inbox)
+        AppDestination.Expiring -> stringResource(Res.string.nav_expiring)
+        AppDestination.Tags -> stringResource(Res.string.nav_catalog)
+        AppDestination.Settings -> stringResource(Res.string.nav_settings)
+    }
+}
 
 @Composable
 fun AppShell(
@@ -93,6 +115,9 @@ fun AppShell(
     onEvent: (DocumentsUiEvent) -> Unit,
 ) {
     var destination by rememberSaveable { mutableStateOf(AppDestination.Documents) }
+    var settingsState by remember { mutableStateOf(SettingsUiState()) }
+    var appLanguage by rememberSaveable { mutableStateOf(AppLanguage.SYSTEM) }
+
     val compact = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.COMPACT
     val showingDocumentDetail = compact && state.selected != null && destination == AppDestination.Documents
     val handleEvent: (DocumentsUiEvent) -> Unit = { event ->
@@ -102,59 +127,81 @@ fun AppShell(
         onEvent(event)
     }
 
-    if (compact) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            bottomBar = {
-                if (!showingDocumentDetail) {
-                    NavigationBar {
-                        AppDestination.entries.forEach { item ->
-                            NavigationBarItem(
-                                selected = destination == item,
-                                onClick = { destination = item },
-                                icon = { DestinationIcon(item) },
-                                label = { Text(item.label) },
-                            )
+    LocalizedAppWrapper(language = appLanguage) {
+        if (compact) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        if (!showingDocumentDetail) {
+                            NavigationBar {
+                                AppDestination.entries.forEach { item ->
+                                    NavigationBarItem(
+                                        selected = destination == item,
+                                        onClick = { destination = item },
+                                        icon = { DestinationIcon(item) },
+                                        label = { Text(item.localizedLabel()) },
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
-            },
-        ) { padding ->
-            Surface(Modifier.fillMaxSize().padding(padding)) {
-                AppDestinationContent(destination, state, handleEvent)
-            }
-        }
-    } else {
-        Surface(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxSize()) {
-                NavigationRail(
-                    header = {
-                        Icon(
-                            imageVector = Icons.Outlined.FolderOpen,
-                            contentDescription = null,
-                            modifier = Modifier.padding(top = PaperlessDimensions.lg)
-                        )
-                    }
-                ) {
-                    AppDestination.entries.forEach { item ->
-                        NavigationRailItem(
-                            selected = destination == item,
-                            onClick = { destination = item },
-                            icon = { DestinationIcon(item) },
-                            label = { Text(item.label) },
+                    },
+                ) { padding ->
+                    Surface(Modifier.fillMaxSize().padding(padding)) {
+                        AppDestinationContent(
+                            destination = destination,
+                            state = state,
+                            settingsState = settingsState,
+                            onSettingsIntent = { intent ->
+                                if (intent is SettingsUiIntent.SelectLanguage) {
+                                    settingsState = settingsState.copy(selectedLanguage = intent.language)
+                                    appLanguage = intent.language
+                                }
+                            },
+                            onEvent = handleEvent,
+                            onNavigate = { destination = it }
                         )
                     }
                 }
-                AppDestinationContent(
-                    destination = destination,
-                    state = state,
-                    onEvent = handleEvent,
-                    modifier = Modifier.weight(1f),
-                )
+            } else {
+                Surface(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxSize()) {
+                        NavigationRail(
+                            header = {
+                                Icon(
+                                    imageVector = Icons.Outlined.FolderOpen,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(top = PaperlessDimensions.lg)
+                                )
+                            }
+                        ) {
+                            AppDestination.entries.forEach { item ->
+                                NavigationRailItem(
+                                    selected = destination == item,
+                                    onClick = { destination = item },
+                                    icon = { DestinationIcon(item) },
+                                    label = { Text(item.localizedLabel()) },
+                                )
+                            }
+                        }
+                        AppDestinationContent(
+                            destination = destination,
+                            state = state,
+                            settingsState = settingsState,
+                            onSettingsIntent = { intent ->
+                                if (intent is SettingsUiIntent.SelectLanguage) {
+                                    settingsState = settingsState.copy(selectedLanguage = intent.language)
+                                    appLanguage = intent.language
+                                }
+                            },
+                            onEvent = handleEvent,
+                            onNavigate = { destination = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
     }
-}
 
 @Composable
 private fun DestinationIcon(item: AppDestination) {
@@ -165,38 +212,217 @@ private fun DestinationIcon(item: AppDestination) {
         AppDestination.Tags -> Icons.Outlined.Label
         AppDestination.Settings -> Icons.Outlined.Settings
     }
-    Icon(icon, contentDescription = item.label)
+    Icon(icon, contentDescription = item.localizedLabel())
 }
 
 @Composable
 private fun AppDestinationContent(
     destination: AppDestination,
     state: DocumentsUiState,
+    settingsState: SettingsUiState,
+    onSettingsIntent: (SettingsUiIntent) -> Unit,
     onEvent: (DocumentsUiEvent) -> Unit,
+    onNavigate: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (destination) {
-        AppDestination.Documents -> DocumentsScreen(state, onEvent, modifier)
-        AppDestination.Inbox -> CollectionScreen(
-            title = "Inbox",
-            subtitle = "Recently captured documents",
-            documents = state.documents.sortedByDescending { it.createdEpochMillis }.take(20),
-            state = state,
-            onEvent = onEvent,
-            modifier = modifier,
-        )
-        AppDestination.Expiring -> CollectionScreen(
-            title = "Expiring",
-            subtitle = "Documents that need attention",
-            documents = state.documents
-                .filter { it.expiryState != ExpiryState.None }
-                .sortedWith(compareBy<DocumentUiModel> { it.expiryState != ExpiryState.Expired }.thenBy { it.expiresAtEpochMillis ?: Long.MAX_VALUE }),
-            state = state,
-            onEvent = onEvent,
-            modifier = modifier,
-        )
-        AppDestination.Tags -> CatalogManagementScreen(state, onEvent, modifier)
-        AppDestination.Settings -> SettingsScreen(state, onEvent, modifier)
+        AppDestination.Documents -> {
+            val selected = state.selected
+            if (selected != null) {
+                val noneUnassigned = stringResource(Res.string.none_unassigned)
+                val noneType = stringResource(Res.string.none)
+                val noneStorage = stringResource(Res.string.none_root_inbox)
+                val detailState = DocumentDetailUiState(
+                    id = selected.id.toString(),
+                    title = selected.title,
+                    extension = selected.filename?.substringAfterLast('.', "JPEG")?.uppercase() ?: "JPEG",
+                    pageCount = selected.pageCount ?: 1,
+                    version = "v1.0",
+                    isIndexed = !selected.syncState.contains("PENDING", ignoreCase = true),
+                    correspondents = listOf(noneUnassigned) + state.correspondents.map { it.name },
+                    selectedCorrespondent = state.correspondents.firstOrNull { it.id == selected.correspondentId }?.name ?: noneUnassigned,
+                    documentTypes = listOf(noneType) + state.documentTypes.map { it.name },
+                    selectedDocumentType = state.documentTypes.firstOrNull { it.id == selected.documentTypeId }?.name ?: noneType,
+                    storagePaths = listOf(noneStorage) + state.storagePaths.map { it.name },
+                    selectedStoragePath = state.storagePaths.firstOrNull { it.id == selected.storagePathId }?.name ?: noneStorage,
+                    asn = selected.archiveSerialNumber?.toString() ?: "",
+                    versionLabel = selected.versionLabel ?: "",
+                    documentDate = selected.createdInput,
+                    expiryDate = selected.expiryInput,
+                    reminderDays = selected.reminderDaysBeforeExpiry ?: 30,
+                    ocrText = selected.content.ifBlank { "No OCR text extracted." },
+                    tags = state.tags.filter { selected.tagIds.contains(it.id) }.map { TagBadge(it.id.toString(), it.name, parseHexColor(it.color)) }
+                )
+                DocumentDetailsScreen(
+                    uiState = detailState,
+                    onIntent = { intent ->
+                        when (intent) {
+                            is DocumentDetailIntent.NavigateBack -> onEvent(DocumentsUiEvent.ClearSelection)
+                            is DocumentDetailIntent.DiscardChanges -> onEvent(DocumentsUiEvent.ClearSelection)
+                            is DocumentDetailIntent.SaveChanges -> onEvent(DocumentsUiEvent.SaveMetadata)
+                            is DocumentDetailIntent.DeleteDocumentClicked -> {
+                                onEvent(DocumentsUiEvent.Delete(selected.id))
+                            }
+                            is DocumentDetailIntent.TitleChanged -> onEvent(DocumentsUiEvent.TitleChanged(intent.title))
+                            is DocumentDetailIntent.AsnChanged -> onEvent(DocumentsUiEvent.ArchiveSerialNumberChanged(intent.asn))
+                            is DocumentDetailIntent.VersionLabelChanged -> onEvent(DocumentsUiEvent.VersionLabelChanged(intent.label))
+                            is DocumentDetailIntent.DocumentDateChanged -> onEvent(DocumentsUiEvent.CreatedDateChanged(intent.date))
+                            is DocumentDetailIntent.ExpiryDateChanged -> onEvent(DocumentsUiEvent.ExpiryChanged(intent.date))
+                            is DocumentDetailIntent.ReminderDaysChanged -> onEvent(DocumentsUiEvent.ReminderDaysChanged(intent.days.toString()))
+                            is DocumentDetailIntent.CorrespondentSelected -> {
+                                val corr = state.correspondents.firstOrNull { it.name == intent.correspondent }
+                                onEvent(DocumentsUiEvent.CorrespondentChanged(corr?.id))
+                            }
+                            is DocumentDetailIntent.DocumentTypeSelected -> {
+                                val type = state.documentTypes.firstOrNull { it.name == intent.type }
+                                onEvent(DocumentsUiEvent.DocumentTypeChanged(type?.id))
+                            }
+                            is DocumentDetailIntent.StoragePathSelected -> {
+                                val path = state.storagePaths.firstOrNull { it.name == intent.path }
+                                onEvent(DocumentsUiEvent.StoragePathChanged(path?.id))
+                            }
+                            else -> {}
+                        }
+                    },
+                    modifier = modifier
+                )
+            } else {
+                DocumentsScreen(state, onEvent, modifier)
+            }
+        }
+        AppDestination.Inbox -> {
+            val inboxState = InboxUiState(
+                documents = state.documents.map { doc ->
+                    val isPending = doc.syncState.contains("PENDING", ignoreCase = true)
+                    InboxDocumentItem(
+                        id = doc.id.toString(),
+                        title = doc.title,
+                        extension = doc.filename?.substringAfterLast('.', "pdf") ?: "pdf",
+                        pageCount = doc.pageCount ?: 1,
+                        fileSizeFormatted = "2.4 MB",
+                        uploadedAgo = doc.createdInput,
+                        status = when {
+                            isPending -> DocumentStatus.OCR_IN_PROGRESS
+                            doc.correspondentId == null -> DocumentStatus.UNASSIGNED
+                            else -> DocumentStatus.NEEDS_REVIEW
+                        },
+                        ocrProgress = if (isPending) 0.68f else null,
+                        tags = emptyList()
+                    )
+                },
+                totalCount = state.documents.size,
+                isAutoIngestionActive = true
+            )
+            InboxScreen(
+                uiState = inboxState,
+                onIntent = { intent ->
+                    when (intent) {
+                        is InboxUiIntent.OpenDocumentDetail -> {
+                            intent.docId.toLongOrNull()?.let { id ->
+                                onEvent(DocumentsUiEvent.Select(id))
+                                onNavigate(AppDestination.Documents)
+                            }
+                        }
+                        is InboxUiIntent.DeleteDocument -> {
+                            intent.docId.toLongOrNull()?.let { id ->
+                                onEvent(DocumentsUiEvent.Delete(id))
+                            }
+                        }
+                        is InboxUiIntent.AssignMetadata -> {
+                            intent.docId.toLongOrNull()?.let { id ->
+                                onEvent(DocumentsUiEvent.Select(id))
+                                onNavigate(AppDestination.Documents)
+                            }
+                        }
+                        else -> {}
+                    }
+                },
+                modifier = modifier
+            )
+        }
+        AppDestination.Expiring -> {
+            val expiringState = ExpiringUiState(
+                documents = state.documents
+                    .filter { it.expiryState != ExpiryState.None }
+                    .map { doc ->
+                        ExpiringDocumentItem(
+                            id = doc.id.toString(),
+                            title = doc.title,
+                            issuer = "Issuer / Provider",
+                            category = DocumentCategory.CONTRACTS,
+                            daysRemaining = when (doc.expiryState) {
+                                ExpiryState.Expired -> 0
+                                ExpiryState.Today -> 1
+                                ExpiryState.Upcoming -> 5
+                                else -> 30
+                            },
+                            docType = doc.filename?.substringAfterLast('.', "PDF")?.uppercase() ?: "PDF",
+                            pageOrDetail = "${doc.pageCount ?: 1}p",
+                            annualCost = "$1,200/yr"
+                        )
+                    },
+                urgentCount = state.documents.count { it.expiryState == ExpiryState.Expired || it.expiryState == ExpiryState.Today },
+                totalCount = state.documents.size
+            )
+            ExpiringScreen(
+                uiState = expiringState,
+                onIntent = { intent ->
+                    when (intent) {
+                        is ExpiringUiIntent.ViewDocument -> {
+                            intent.docId.toLongOrNull()?.let { id ->
+                                onEvent(DocumentsUiEvent.Select(id))
+                                onNavigate(AppDestination.Documents)
+                            }
+                        }
+                        is ExpiringUiIntent.ExtendDate -> {
+                            // Handle extend date
+                        }
+                        is ExpiringUiIntent.MarkRenewed -> {
+                            // Handle mark renewed
+                        }
+                        is ExpiringUiIntent.SelectFilter -> {
+                            // Handle filter selection
+                        }
+                    }
+                },
+                modifier = modifier
+            )
+        }
+        AppDestination.Tags -> {
+            val catalogState = CatalogUiState(
+                tags = listOf(
+                    TagItem(id = "1", name = "Confidential ID & Passports", documentCount = 4, color = TerracottaPrimary, subtitle = "Secure biometric scans", isSpanFull = true),
+                    TagItem(id = "2", name = "Contracts", documentCount = 12, color = TerracottaSecondary, categoryLabel = "Legal"),
+                    TagItem(id = "3", name = "Tax Receipts", documentCount = 8, color = TerracottaPrimary, categoryLabel = "Finance"),
+                    TagItem(id = "4", name = "Health & Medical", documentCount = 3, color = TerracottaSecondary, categoryLabel = "Medical")
+                ),
+                categorizedCount = 4
+            )
+            CatalogScreen(
+                uiState = catalogState,
+                onIntent = { intent ->
+                    when (intent) {
+                        is CatalogUiIntent.TagClicked -> {
+                            // Handle tag click
+                        }
+                        is CatalogUiIntent.CreateNewTag -> {
+                            // Handle create new tag
+                        }
+                        else -> {}
+                    }
+                },
+                modifier = modifier
+            )
+        }
+        AppDestination.Settings -> {
+            SettingsScreen(
+                uiState = settingsState,
+                onIntent = { intent ->
+                    onSettingsIntent(intent)
+                },
+                modifier = modifier
+            )
+        }
     }
 }
 
@@ -642,219 +868,6 @@ private fun StoragePathsList(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SettingsScreen(
-    state: DocumentsUiState,
-    onEvent: (DocumentsUiEvent) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text("Settings") }) }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(PaperlessDimensions.lg),
-            verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.md)
-        ) {
-            // 1. Cloudflare Sync Server
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(
-                        Modifier.padding(PaperlessDimensions.lg),
-                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.CloudSync, null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(PaperlessDimensions.sm))
-                            Text("Cloudflare Worker Sync Server", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text(
-                            "Configure your R2 & D1 Cloudflare Worker backend for cross-device sync.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(Modifier.height(PaperlessDimensions.xs))
-
-                        OutlinedTextField(
-                            value = state.serverUrl,
-                            onValueChange = { onEvent(DocumentsUiEvent.ServerUrlChanged(it)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Server URL") },
-                            placeholder = { Text("https://your-worker.workers.dev") },
-                            singleLine = true
-                        )
-
-                        OutlinedTextField(
-                            value = state.authToken,
-                            onValueChange = { onEvent(DocumentsUiEvent.AuthTokenChanged(it)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("API Auth Token") },
-                            singleLine = true,
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(
-                                        if (passwordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                        contentDescription = "Toggle token visibility"
-                                    )
-                                }
-                            }
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilledTonalButton(
-                                onClick = { onEvent(DocumentsUiEvent.TestConnection) },
-                                enabled = state.connectionTestStatus != ConnectionTestStatus.Testing
-                            ) {
-                                if (state.connectionTestStatus == ConnectionTestStatus.Testing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(PaperlessDimensions.xs))
-                                    Text("Testing…")
-                                } else {
-                                    Text("Test Connection")
-                                }
-                            }
-
-                            Button(
-                                onClick = { onEvent(DocumentsUiEvent.SaveSyncSettings) }
-                            ) {
-                                Text("Save Settings")
-                            }
-                        }
-
-                        state.connectionTestMessage?.let { testMsg ->
-                            val isError = state.connectionTestStatus == ConnectionTestStatus.Error
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
-                                )
-                            ) {
-                                Text(
-                                    text = testMsg,
-                                    modifier = Modifier.padding(PaperlessDimensions.md),
-                                    color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Auto-Sync Preferences
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(
-                        Modifier.padding(PaperlessDimensions.lg),
-                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Wifi, null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(PaperlessDimensions.sm))
-                            Text("Auto-Sync Behavior", style = MaterialTheme.typography.titleLarge)
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Sync on Wi-Fi only", style = MaterialTheme.typography.bodyLarge)
-                                Text("Conserve mobile data during background sync", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(
-                                checked = state.syncOnWifiOnly,
-                                onCheckedChange = { onEvent(DocumentsUiEvent.SyncOnWifiOnlyToggled(it)) }
-                            )
-                        }
-
-                        Text("Sync Interval", style = MaterialTheme.typography.labelMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
-                            listOf(15 to "15m", 30 to "30m", 60 to "1h", 0 to "Manual").forEach { (interval, label) ->
-                                FilterChip(
-                                    selected = state.syncIntervalMinutes == interval,
-                                    onClick = { onEvent(DocumentsUiEvent.SyncIntervalChanged(interval)) },
-                                    label = { Text(label) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Storage & Local Cache
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(
-                        Modifier.padding(PaperlessDimensions.lg),
-                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.sm)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Storage, null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(PaperlessDimensions.sm))
-                            Text("Storage & Cache", style = MaterialTheme.typography.titleLarge)
-                        }
-
-                        Text("Local document cache size: ${state.cacheSizeFormatted}", style = MaterialTheme.typography.bodyMedium)
-
-                        OutlinedButton(
-                            onClick = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(true)) }
-                        ) {
-                            Text("Clear File Cache")
-                        }
-                    }
-                }
-            }
-
-            // 4. About App
-            item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(
-                        Modifier.padding(PaperlessDimensions.lg),
-                        verticalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(PaperlessDimensions.sm))
-                            Text("Paperless KMP", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text("Version v0.1.0", style = MaterialTheme.typography.bodyMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(PaperlessDimensions.xs)) {
-                            AssistChip(onClick = {}, enabled = false, label = { Text("Room DB v5") })
-                            AssistChip(onClick = {}, enabled = false, label = { Text("Compose Multiplatform") })
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (state.showClearCacheDialog) {
-        AlertDialog(
-            onDismissRequest = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(false)) },
-            title = { Text("Clear file cache?") },
-            text = { Text("This will remove locally cached document files. They can be re-downloaded or re-synced from your server.") },
-            confirmButton = {
-                TextButton(onClick = { onEvent(DocumentsUiEvent.ClearLocalCache) }) {
-                    Text("Clear Cache", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onEvent(DocumentsUiEvent.ToggleClearCacheDialog(false)) }) { Text("Cancel") }
-            }
-        )
     }
 }
 

@@ -55,6 +55,23 @@ class RoomDocumentRepository(
         }
         val sql = if (fts.isNotEmpty()) "SELECT d.* FROM documents d JOIN documents_fts f ON f.rowid = d.id WHERE ${where.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100" else "SELECT d.* FROM documents d WHERE ${where.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100"
         val raw = RoomRawQuery(sql = sql, onBindStatement = { stmt -> args.forEachIndexed { index, value -> if (value is String) stmt.bindText(index + 1, value) else stmt.bindLong(index + 1, (value as Number).toLong()) } })
-        return dao.searchFts(raw).map(DocumentEntity::toDomain)
+        return runCatching {
+            dao.searchFts(raw).map(DocumentEntity::toDomain)
+        }.getOrElse {
+            if (fts.isNotEmpty()) {
+                val fallbackWhere = where.toMutableList().apply { removeIf { it.contains("f MATCH") } }
+                val fallbackArgs = args.toMutableList().apply { removeIf { it is String && fts.any { token -> it.contains(token) } } }
+                fts.forEach { token ->
+                    fallbackWhere += "(d.title LIKE ? OR d.content LIKE ?)"
+                    fallbackArgs += "%$token%"
+                    fallbackArgs += "%$token%"
+                }
+                val fallbackSql = "SELECT d.* FROM documents d WHERE ${fallbackWhere.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100"
+                val fallbackRaw = RoomRawQuery(sql = fallbackSql, onBindStatement = { stmt -> fallbackArgs.forEachIndexed { index, value -> if (value is String) stmt.bindText(index + 1, value) else stmt.bindLong(index + 1, (value as Number).toLong()) } })
+                runCatching { dao.searchFts(fallbackRaw).map(DocumentEntity::toDomain) }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+        }
     }
 }

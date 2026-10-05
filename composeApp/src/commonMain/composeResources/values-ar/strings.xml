@@ -1,0 +1,212 @@
+<resources>
+    <string name="app_name">Paperless Mobile</string>
+
+    <!-- Navigation & Destinations -->
+    <string name="nav_documents">المستندات</string>
+    <string name="nav_inbox">الوارد</string>
+    <string name="nav_expiring">وشيكة الانتهاء</string>
+    <string name="nav_catalog">الكتالوج</string>
+    <string name="nav_settings">الإعدادات</string>
+
+    <!-- Documents Screen -->
+    <string name="documents_title">المستندات</string>
+    <string name="documents_library_count">%d في مكتبتك</string>
+    <string name="documents_sync_pending">%d مزامنة معلقة</string>
+    <string name="documents_search_placeholder">البحث في مستنداتك...</string>
+    <string name="documents_search_supports">يدعم: tag:, type:, correspondent:, after:, expiry:</string>
+    <string name="documents_empty_title">لم يتم العثور على مستندات</string>
+    <string name="documents_empty_subtitle">جرب تعديل عبارة البحث أو الفلاتر.</string>
+    <string name="importing_indexing">جاري استيراد وفهرسة المستند...</string>
+    <string name="importing_desc">جاري استخراج النص بالتعرف الضوئي وحفظه في قاعدة البيانات.</string>
+
+    <string name="add_document">إضافة مستند</string>
+    <string name="add_to_library">إضافة إلى المكتبة</string>
+    <string name="add_to_library_desc">اختر كيفية إضافة المستند إلى أرشيف Paperless الخاص بك.</string>
+    <string name="import_file">استيراد ملف</string>
+    <string name="import_file_desc">اختر ملف PDF أو JPG أو PNG من جهازك أو سحابتك.</string>
+    <string name="scan_document">مسح ضوئي للكاميرا</string>
+    <string name="scan_document_desc">التقاط صفحة أو أكثر مع اكتشاف تلقائي للحدود وتصحيح المنظور.</string>
+    <string name="encrypted_storage">تخزين مشفر AES-256</string>
+    <string name="help_guide">المساعدة والدليل</string>
+    <string name="pending_upload">قيد الرفع</string>
+
+    <!-- Inbox Screen -->
+    <string name="inbox_title">صندوق الوارد</string>
+    <string name="inbox_subtitle">المستندات الملتقطة حديثاً (%d مستندات)</string>
+    <string name="inbox_empty_title">صندوق الوارد فارغ</string>
+    <string name="inbox_empty_subtitle">رائع! ستظهر المستندات الجديدة هنا عند استيرادها.</string>
+    <string name="select_all">تحديد الكل</string>
+    <string name="mark_reviewed">تحديد كمراجَع</string>
+    <string name="process_queue">معالجة القائمة</string>
+    <string name="auto_ingestion_active">الاستيراد التلقائي نشط</string>
+    <string name="status_needs_review">يتطلب المراجعة</string>
+    <string name="status_ocr_progress">جاري التعرف الضوئي</string>
+    <string name="status_unassigned">غير معين</string>
+    <string name="assign_metadata">تعيين البيانات الوصفية</string>
+
+    <!-- Expiring Screen -->
+    <string name="expiring_title">مستندات وشيكة الانتهاء</string>
+    <string name="expiring_subtitle">المستندات التي تتطلب الانتباه والتجديد</string>
+    <string name="expiring_empty_title">لا توجد مستندات وشيكة الانتهاء</string>
+    <string name="expiring_empty_subtitle">لا توجد مستندات محددة بتواريخ انتهاء قريبة.</string>
+    <string name="immediate_priority">أولوية عاجلة</string>
+    <string name="extend_date">تمديد التاريخ</string>
+    <string name="renewed">تم التجديد</string>
+    <string name="view">عرض</string>
+    <string name="expires_in_days">ينتهي خلال %d أيام</string>
+    <string name="status_expired">منتهي الصلاحية</string>
+    <string name="status_expires_today">ينتهي اليوم</string>
+
+    <!-- Catalog Screen -->
+    <string name="catalog_title">إدارة الكتالوج</string>
+    <string name="catalog_subtitle">تنظيم التصنيفات، الجهات المراسلة، ومسارات التخزين</string>
+    <string name="catalog_tags">الوسوم</string>
+    <string name="catalog_correspondents">الجهات المراسلة</string>
+    <string name="catalog_document_types">أنواع المستندات</string>
+    <string name="catalog_storage_paths">مسارات التخزين</string>
+    <string name="search_tags">البحث في الوسوم...</string>
+    <string name="active_tags">الوسوم النشطة</string>
+    <string name="smart_autotagging">التصنيف الذكي مفعّل</string>
+
+    <string name="add_tag">إضافة وسم</string>
+    <string name="edit_tag">تعديل الوسم</string>
+    <string name="tag_name">اسم الوسم</string>
+    <string name="color">اللون</string>
+    <string name="hex_color_code">كود اللون Hex</string>
+    <string name="inbox_tag">وسم صندوق الوارد</string>
+    <string name="inbox_tag_desc">تُسند المستندات الجديدة لهذا الوسم تلقائياً</string>
+    <string name="parent_tag">الوسم الأب</string>
+    <string name="auto_matching_rules">قواعد المطابقة التلقائية</string>
+    <string name="matching_pattern">نمط المطابقة</string>
+    <string name="matching_algorithm">خوارزمية المطابقة</string>
+    <string name="ignore_case">تجاهل حالة الأحرف</string>
+
+    <string name="add_correspondent">إضافة جهة مراسلة</string>
+    <string name="edit_correspondent">تعديل جهة المراسلة</string>
+    <string name="correspondent_desc">حدد جهة مرسلة أو مستقبلة لوسم المستندات القادمة تلقائياً.</string>
+
+    <string name="add_document_type">إضافة نوع مستند</string>
+    <string name="edit_document_type">تعديل نوع المستند</string>
+
+    <string name="add_storage_path">إضافة مسار تخزين</string>
+    <string name="edit_storage_path">تعديل مسار التخزين</string>
+    <string name="path_template">قالب المسار</string>
+
+    <string name="delete_confirm">حذف %s؟</string>
+    <string name="delete_warning">سيؤدي هذا لإزالة \'%s\' من الكتالوج الخاص بك.</string>
+
+    <!-- Document Details -->
+    <string name="document_details_title">تفاصيل المستند</string>
+    <string name="section_info">معلومات الوثيقة</string>
+    <string name="section_versions">إصدارات الملف</string>
+    <string name="section_dates_reminders">التواريخ والتنبيهات</string>
+    <string name="section_tags">الوسوم والتصنيفات</string>
+    <string name="section_ocr">النص المستخرج</string>
+    <string name="section_actions">الإجراءات</string>
+
+    <string name="label_document_title">عنوان الوثيقة</string>
+    <string name="label_correspondent">جهة المراسلة</string>
+    <string name="label_document_type">نوع المستند</string>
+    <string name="label_storage_path">مسار الحفظ</string>
+    <string name="label_asn">رقم الأرشيف التسلسلي (ASN)</string>
+    <string name="label_version_label">ملصق الإصدار</string>
+    <string name="placeholder_asn">مثال: ASN-04981</string>
+    <string name="placeholder_version">مثال: المسح الأصلي</string>
+
+    <string name="none_unassigned">لا يوجد (غير معين)</string>
+    <string name="none">لا يوجد</string>
+    <string name="none_root_inbox">لا يوجد (الجذر / الوارد)</string>
+
+    <string name="label_version_number">الإصدار %d</string>
+    <string name="badge_current">الحالي</string>
+    <string name="version_created">تم الإنشاء: %s</string>
+    <string name="upload_new_version">تحميل إصدار جديد</string>
+
+    <string name="label_document_date">تاريخ المستند</string>
+    <string name="label_expiry_date">تاريخ الانتهاء</string>
+    <string name="label_reminder_days">أيام التذكير</string>
+
+    <string name="ocr_preview_snippet">معاينة النص المستخرج:</string>
+    <string name="in_app_preview">معاينة داخل التطبيق</string>
+    <string name="open_external">فتح في تطبيق خارجي</string>
+    <string name="action_copy">نسخ</string>
+    <string name="search">بحث</string>
+    <string name="indexed">مفهرس</string>
+
+    <string name="field_title">العنوان</string>
+    <string name="field_correspondent">جهة المراسلة</string>
+    <string name="field_document_type">نوع المستند</string>
+    <string name="field_storage_path">مسار التخزين</string>
+    <string name="field_created_date">تاريخ الإنشاء</string>
+    <string name="field_added_date">تاريخ الإضافة</string>
+    <string name="field_tags">الوسوم</string>
+    <string name="field_asn">رقم الأرشيف التسلسلي</string>
+    <string name="field_content">المحتوى</string>
+    <string name="field_notes">الملاحظات</string>
+    <string name="field_custom_fields">الحقول المخصصة</string>
+
+    <string name="action_save">حفظ التعديلات</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_delete">حذف المستند</string>
+    <string name="action_edit">تعديل</string>
+    <string name="action_add_note">إضافة ملاحظة</string>
+    <string name="action_retry">إعادة المحاولة</string>
+
+    <string name="dialog_delete_confirm_title">حذف المستند</string>
+    <string name="dialog_delete_confirm_message">هل أنت تأكد من رغبتك في حذف هذا المستند؟ لا يمكن التراجع عن هذا الإجراء.</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_subtitle">التفضيلات، مزامنة Cloudflare والتخزين الأرشيفي.</string>
+    <string name="settings_server_title">خادم مزامنة Cloudflare Worker</string>
+    <string name="settings_server_desc">قم بإعداد خادم Cloudflare لضمان مزامنة سلسة عبر أجهزتك.</string>
+    <string name="settings_server_url">رابط الخادم</string>
+    <string name="settings_api_token">رمز توثيق API</string>
+    <string name="settings_test_connection">اختبار الاتصال</string>
+    <string name="connecting">جاري الاتصال...</string>
+    <string name="settings_connection_success">تم الاتصال بنجاح!</string>
+    <string name="settings_connection_failed">فشل الاتصال</string>
+    <string name="settings_save">حفظ الإعدادات</string>
+    <string name="settings_saved">تم الحفظ</string>
+
+    <string name="storage_and_cache">التخزين والتخزين المؤقت</string>
+    <string name="local_document_cache">ذاكرة التخزين المؤقت للمستندات</string>
+    <string name="clear_cache">مسح التخزين المؤقت</string>
+    <string name="confirm_clear">تأكيد المسح</string>
+
+    <string name="ocr_indexing">التعرف الضوئي والفهرسة الذكية</string>
+    <string name="ocr_indexing_desc">التعرف الضوئي على النصوص في الجهاز للبحث داخل الصور والمسوحات.</string>
+    <string name="installed_lexicons">حزم المعاجم المثبتة</string>
+    <string name="offline_ocr">محرك التعرف الضوئي بدون إنترنت</string>
+    <string name="offline_ocr_desc">معالجة المستندات داخل جهازك فقط للحفاظ على الخصوصية</string>
+
+    <string name="editorial_build">محرك DocVault • الإصدار 2026.10</string>
+    <string name="crafted_for_scholars">صمم للباحثين والدارسين والأرشيفيين.</string>
+
+    <string name="settings_auto_sync">سلوك المزامنة التلقائية</string>
+    <string name="settings_sync_wifi">المزامنة على الواي فاي فقط</string>
+    <string name="sync_wifi_desc">توفير بيانات الهاتف أثناء المزامنة الخلفية</string>
+    <string name="settings_sync_interval">فترة المزامنة</string>
+
+    <string name="settings_language_title">لغة التطبيق</string>
+    <string name="settings_language_subtitle">اختر لغة عرض التطبيق (العربية، الفرنسية، الإنجليزية)</string>
+    <string name="language_system">افتراضي النظام</string>
+    <string name="language_english">English (الإنجليزية)</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_french">Français (الفرنسية)</string>
+
+    <string name="settings_theme_title">المظهر</string>
+    <string name="settings_theme_system">افتراضي النظام</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+
+    <string name="settings_about_title">حول التطبيق</string>
+    <string name="settings_version">الإصدار %s</string>
+
+    <!-- Sync & General -->
+    <string name="sync_status_idle">محدث</string>
+    <string name="sync_status_syncing">جاري المزامنة...</string>
+    <string name="sync_status_error">خطأ في المزامنة</string>
+    <string name="loading">جاري التحميل...</string>
+    <string name="error_generic">حدث خطأ ما. يرجى المحاولة مرة أخرى.</string>
+</resources>

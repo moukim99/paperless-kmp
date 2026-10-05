@@ -10,6 +10,7 @@ import com.nextstepai.paperless.domain.usecase.DeleteDocumentUseCase
 import com.nextstepai.paperless.domain.usecase.UpdateDocumentMetadataUseCase
 import com.nextstepai.paperless.domain.platform.DocumentPreviewer
 import com.nextstepai.paperless.domain.platform.ReminderScheduler
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -202,10 +203,23 @@ class DocumentsViewModel(
 ) {
     private val _state = MutableStateFlow(DocumentsUiState())
     private var searchJob: Job? = null
+    private var cachedDocs: List<DocumentUiModel> = emptyList()
     val state: StateFlow<DocumentsUiState> = _state.asStateFlow()
 
     init {
-        scope.launch { repository.observeDocuments().collectLatest { docs -> _state.update { state -> if (state.query.isBlank()) state.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }, loading = false) else state.copy(loading = false) } } }
+        scope.launch {
+            repository.observeDocuments().collectLatest { docs ->
+                val uiDocs = docs.map { d -> DocumentUiModel.fromDomain(d) }
+                cachedDocs = uiDocs
+                _state.update { state ->
+                    if (state.query.isBlank()) {
+                        state.copy(documents = uiDocs, loading = false)
+                    } else {
+                        state.copy(loading = false)
+                    }
+                }
+            }
+        }
         scope.launch { catalog.observeCorrespondents().collect { v -> _state.update { it.copy(correspondents = v) } } }
         scope.launch { catalog.observeDocumentTypes().collect { v -> _state.update { it.copy(documentTypes = v) } } }
         scope.launch { catalog.observeStoragePaths().collect { v -> _state.update { it.copy(storagePaths = v) } } }
@@ -219,20 +233,23 @@ class DocumentsViewModel(
             is DocumentsUiEvent.SearchChanged -> {
                 _state.update { it.copy(query = event.value, error = null) }
                 searchJob?.cancel()
-                searchJob = scope.launch {
-                    delay(250)
-                    if (event.value.isBlank()) return@launch
-                    runCatching { repository.search(event.value) }
-                        .onSuccess { docs ->
-                            if (_state.value.query == event.value) {
-                                _state.update { it.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }) }
+                if (event.value.isBlank()) {
+                    _state.update { it.copy(documents = cachedDocs) }
+                } else {
+                    searchJob = scope.launch {
+                        delay(250)
+                        runCatching { repository.search(event.value) }
+                            .onSuccess { docs ->
+                                if (_state.value.query == event.value) {
+                                    _state.update { it.copy(documents = docs.map { d -> DocumentUiModel.fromDomain(d) }) }
+                                }
                             }
-                        }
-                        .onFailure { e ->
-                            if (_state.value.query == event.value) {
-                                _state.update { it.copy(error = e.message) }
+                            .onFailure { e ->
+                                if (_state.value.query == event.value) {
+                                    _state.update { it.copy(error = e.message) }
+                                }
                             }
-                        }
+                    }
                 }
             }
             is DocumentsUiEvent.Select -> select(event.id)
@@ -466,7 +483,12 @@ class DocumentsViewModel(
         }
         runCatching {
             val client = io.ktor.client.HttpClient()
-            val response = client.get(if (url.endsWith("/")) "${url}api/documents" else "$url/api/documents")
+            val token = _state.value.authToken.trim()
+            val response = client.get(if (url.endsWith("/")) "${url}api/documents" else "$url/api/documents") {
+                if (token.isNotBlank()) {
+                    bearerAuth(token)
+                }
+            }
             client.close()
             if (response.status.value in 200..299) {
                 _state.update {
