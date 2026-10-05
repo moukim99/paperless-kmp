@@ -9,3 +9,8 @@ import com.nextstepai.paperless.domain.capture.DocumentInput
 actual fun DocumentScannerButton(onScanned: (DocumentInput) -> Unit) {
     OutlinedButton(onClick = {}, enabled = false) { Text("Scanner: Android only") }
 }
+
+@Composable
+actual fun rememberDocumentScannerLauncher(onScanned: (DocumentInput) -> Unit): () -> Unit {
+    return rememberDocumentPickerLauncher(onScanned)
+}

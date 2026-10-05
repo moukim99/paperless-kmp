@@ -4,4 +4,6 @@ interface DocumentFileStore {
     suspend fun read(documentId: Long): ByteArray
     suspend fun save(documentId: Long, filename: String, bytes: ByteArray)
     suspend fun localPath(documentId: Long): String?
+    suspend fun cacheSize(): Long
+    suspend fun clearCache()
 }

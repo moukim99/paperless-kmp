@@ -33,6 +33,10 @@ kotlin {
         desktopMain.dependencies {
             implementation("io.ktor:ktor-client-cio:3.6.0")
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+        }
     }
 }
 

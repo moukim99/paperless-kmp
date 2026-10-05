@@ -10,19 +10,27 @@ import java.io.File
 
 @Composable
 actual fun DocumentPickerButton(onPicked: (DocumentInput) -> Unit) {
-    Button(onClick = {
+    val launch = rememberDocumentPickerLauncher(onPicked)
+    Button(onClick = launch) { Text("Add document") }
+}
+
+@Composable
+actual fun rememberDocumentPickerLauncher(onPicked: (DocumentInput) -> Unit): () -> Unit {
+    return {
         val dialog = FileDialog(null as Frame?, "Select document", FileDialog.LOAD)
         dialog.isVisible = true
-        val file = dialog.file ?: return@Button
-        val dir = dialog.directory ?: return@Button
-        val selected = File(dir, file)
-        val mime = when (selected.extension.lowercase()) {
-            "pdf" -> "application/pdf"
-            "png" -> "image/png"
-            "jpg", "jpeg" -> "image/jpeg"
-            "txt" -> "text/plain"
-            else -> "application/octet-stream"
+        val file = dialog.file
+        val dir = dialog.directory
+        if (file != null && dir != null) {
+            val selected = File(dir, file)
+            val mime = when (selected.extension.lowercase()) {
+                "pdf" -> "application/pdf"
+                "png" -> "image/png"
+                "jpg", "jpeg" -> "image/jpeg"
+                "txt" -> "text/plain"
+                else -> "application/octet-stream"
+            }
+            onPicked(DocumentInput(selected.name, mime, selected.readBytes()))
         }
-        onPicked(DocumentInput(selected.name, mime, selected.readBytes()))
-    }) { Text("Add document") }
+    }
 }

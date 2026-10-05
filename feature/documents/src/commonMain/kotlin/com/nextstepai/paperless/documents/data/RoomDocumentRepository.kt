@@ -4,16 +4,24 @@ package com.nextstepai.paperless.documents.data
 
 import androidx.room.RoomRawQuery
 import com.nextstepai.paperless.database.dao.DocumentDao
+import com.nextstepai.paperless.database.dao.SyncOperationDao
 import com.nextstepai.paperless.database.entity.DocumentEntity
 import com.nextstepai.paperless.database.mapper.*
 import com.nextstepai.paperless.domain.model.*
 import com.nextstepai.paperless.domain.repository.DocumentRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
-class RoomDocumentRepository(private val dao: DocumentDao) : DocumentRepository {
+class RoomDocumentRepository(
+    private val dao: DocumentDao,
+    private val syncOpDao: SyncOperationDao? = null
+) : DocumentRepository {
     override fun observeDocuments(): Flow<List<Document>> = dao.observeAll().map { it.map(DocumentEntity::toDomain) }
     override fun observeDocument(id: Long): Flow<DocumentWithRelations?> = dao.observeWithRelations(id).map { it?.toDomain() }
+    override fun observeVersions(rootId: Long): Flow<List<Document>> = dao.observeVersions(rootId).map { it.map(DocumentEntity::toDomain) }
+    override fun observeLatestSyncError(documentId: Long): Flow<String?> =
+        syncOpDao?.observeLatestForDocument(documentId)?.map { it?.lastError } ?: flowOf(null)
     override fun observeExpiring(beforeEpochMillis: Long): Flow<List<Document>> = dao.observeExpiring(beforeEpochMillis).map { it.map(DocumentEntity::toDomain) }
     override suspend fun getByChecksum(checksum: String): Document? = dao.findByChecksum(checksum)?.toDomain()
     override suspend fun getById(id: Long): Document? = dao.findById(id)?.toDomain()
@@ -22,7 +30,7 @@ class RoomDocumentRepository(private val dao: DocumentDao) : DocumentRepository 
     override suspend fun delete(id: Long) = dao.softDelete(id, kotlin.time.Clock.System.now().toEpochMilliseconds())
     override suspend fun markSynced(id: Long, remoteId: String, serverVersion: Long, syncedModified: Long) = dao.markSynced(id, remoteId, serverVersion, kotlin.time.Clock.System.now().toEpochMilliseconds(), syncedModified)
     override suspend fun markSyncState(id: Long, state: String, error: String?) = dao.markSyncState(id, state)
-    override suspend fun updateMetadata(id: Long, title: String, expiresAt: Long?, reminderDaysBeforeExpiry: Int?) = dao.updateMetadata(id, title, expiresAt, reminderDaysBeforeExpiry, kotlin.time.Clock.System.now().toEpochMilliseconds())
+    override suspend fun updateMetadata(id: Long, title: String, content: String, versionLabel: String?, created: Long, archiveSerialNumber: Long?, expiresAt: Long?, reminderDaysBeforeExpiry: Int?) = dao.updateMetadata(id, title, content, versionLabel, created, archiveSerialNumber, expiresAt, reminderDaysBeforeExpiry, kotlin.time.Clock.System.now().toEpochMilliseconds())
     override suspend fun search(query: String): List<Document> {
         val parts = query.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return emptyList()
@@ -47,6 +55,23 @@ class RoomDocumentRepository(private val dao: DocumentDao) : DocumentRepository 
         }
         val sql = if (fts.isNotEmpty()) "SELECT d.* FROM documents d JOIN documents_fts f ON f.rowid = d.id WHERE ${where.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100" else "SELECT d.* FROM documents d WHERE ${where.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100"
         val raw = RoomRawQuery(sql = sql, onBindStatement = { stmt -> args.forEachIndexed { index, value -> if (value is String) stmt.bindText(index + 1, value) else stmt.bindLong(index + 1, (value as Number).toLong()) } })
-        return dao.searchFts(raw).map(DocumentEntity::toDomain)
+        return runCatching {
+            dao.searchFts(raw).map(DocumentEntity::toDomain)
+        }.getOrElse {
+            if (fts.isNotEmpty()) {
+                val fallbackWhere = where.toMutableList().apply { removeIf { it.contains("f MATCH") } }
+                val fallbackArgs = args.toMutableList().apply { removeIf { it is String && fts.any { token -> it.contains(token) } } }
+                fts.forEach { token ->
+                    fallbackWhere += "(d.title LIKE ? OR d.content LIKE ?)"
+                    fallbackArgs += "%$token%"
+                    fallbackArgs += "%$token%"
+                }
+                val fallbackSql = "SELECT d.* FROM documents d WHERE ${fallbackWhere.joinToString(" AND ")} ORDER BY d.created DESC LIMIT 100"
+                val fallbackRaw = RoomRawQuery(sql = fallbackSql, onBindStatement = { stmt -> fallbackArgs.forEachIndexed { index, value -> if (value is String) stmt.bindText(index + 1, value) else stmt.bindLong(index + 1, (value as Number).toLong()) } })
+                runCatching { dao.searchFts(fallbackRaw).map(DocumentEntity::toDomain) }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+        }
     }
 }

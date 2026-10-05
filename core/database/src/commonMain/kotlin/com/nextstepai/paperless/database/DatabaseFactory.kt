@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 
 fun buildDatabase(builder: RoomDatabase.Builder<AppDatabase>): AppDatabase =
     builder
+        .addCallback(DATABASE_CALLBACK)
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()

@@ -10,12 +10,16 @@ import kotlinx.coroutines.tasks.await
 
 class AndroidMlKitOcrEngine : OcrEngine {
     override suspend fun extractText(bytes: ByteArray, mimeType: String): String = withContext(Dispatchers.IO) {
-        require(mimeType.startsWith("image/")) { "Android ML Kit OCR currently accepts image captures; PDF page rasterization is handled by the scanner layer." }
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ?: error("Unable to decode image for OCR")
-        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            .process(InputImage.fromBitmap(bitmap, 0))
-            .await()
-            .text
+        if (mimeType.equals("text/plain", ignoreCase = true)) {
+            return@withContext runCatching { bytes.decodeToString() }.getOrDefault("")
+        }
+        val bitmap = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+            ?: return@withContext ""
+        runCatching {
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                .process(InputImage.fromBitmap(bitmap, 0))
+                .await()
+                .text
+        }.getOrDefault("")
     }
 }

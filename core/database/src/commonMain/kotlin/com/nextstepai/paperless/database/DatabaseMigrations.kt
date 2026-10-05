@@ -1,8 +1,39 @@
 package com.nextstepai.paperless.database
 
+import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
+
+fun createFtsTableAndTriggers(connection: SQLiteConnection) {
+    connection.execSQL("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+            title, content, filename,
+            content='documents', content_rowid='id', tokenize='unicode61'
+        )
+    """.trimIndent())
+    connection.execSQL("""
+        CREATE TRIGGER IF NOT EXISTS documents_fts_ai AFTER INSERT ON documents BEGIN
+          INSERT INTO documents_fts(rowid, title, content, filename)
+          VALUES (new.id, new.title, new.content, coalesce(new.filename, ''));
+        END
+    """.trimIndent())
+    connection.execSQL("""
+        CREATE TRIGGER IF NOT EXISTS documents_fts_ad AFTER DELETE ON documents BEGIN
+          INSERT INTO documents_fts(documents_fts, rowid, title, content, filename)
+          VALUES('delete', old.id, old.title, old.content, coalesce(old.filename, ''));
+        END
+    """.trimIndent())
+    connection.execSQL("""
+        CREATE TRIGGER IF NOT EXISTS documents_fts_au AFTER UPDATE OF title, content, filename ON documents BEGIN
+          INSERT INTO documents_fts(documents_fts, rowid, title, content, filename)
+          VALUES('delete', old.id, old.title, old.content, coalesce(old.filename, ''));
+          INSERT INTO documents_fts(rowid, title, content, filename)
+          VALUES (new.id, new.title, new.content, coalesce(new.filename, ''));
+        END
+    """.trimIndent())
+    connection.execSQL("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
+}
 
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(connection: SQLiteConnection) {
@@ -16,36 +47,9 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
  * while the current Room KMP line does not expose @Fts5. BundledSQLiteDriver supports FTS5. */
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(connection: SQLiteConnection) {
-        connection.execSQL("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
-                title, content, filename,
-                content='documents', content_rowid='id', tokenize='unicode61'
-            )
-        """.trimIndent())
-        connection.execSQL("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_ai AFTER INSERT ON documents BEGIN
-              INSERT INTO documents_fts(rowid, title, content, filename)
-              VALUES (new.id, new.title, new.content, coalesce(new.filename, ''));
-            END
-        """.trimIndent())
-        connection.execSQL("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_ad AFTER DELETE ON documents BEGIN
-              INSERT INTO documents_fts(documents_fts, rowid, title, content, filename)
-              VALUES('delete', old.id, old.title, old.content, coalesce(old.filename, ''));
-            END
-        """.trimIndent())
-        connection.execSQL("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_au AFTER UPDATE OF title, content, filename ON documents BEGIN
-              INSERT INTO documents_fts(documents_fts, rowid, title, content, filename)
-              VALUES('delete', old.id, old.title, old.content, coalesce(old.filename, ''));
-              INSERT INTO documents_fts(rowid, title, content, filename)
-              VALUES (new.id, new.title, new.content, coalesce(new.filename, ''));
-            END
-        """.trimIndent())
-        connection.execSQL("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
+        createFtsTableAndTriggers(connection)
     }
 }
-
 
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(connection: SQLiteConnection) {
@@ -54,3 +58,15 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         connection.execSQL("CREATE INDEX IF NOT EXISTS idx_custom_fields_name ON custom_fields(name)")
     }
 }
+
+val DATABASE_CALLBACK = object : RoomDatabase.Callback() {
+    override fun onCreate(connection: SQLiteConnection) {
+        createFtsTableAndTriggers(connection)
+    }
+
+    override fun onOpen(connection: SQLiteConnection) {
+        connection.execSQL("PRAGMA journal_mode=WAL;")
+        connection.execSQL("PRAGMA synchronous=NORMAL;")
+    }
+}
+
